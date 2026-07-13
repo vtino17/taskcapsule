@@ -1,0 +1,33 @@
+# Build
+dist/
+bin/
+/taskcapsule
+/taskcapsule.exe
+
+# Go
+vendor/
+*.test
+*.out
+coverage.out
+*.prof
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# State / temp
+.taskcapsule/
+dev/
+.env
+.env.*
+!.env.example
+
+# Temp
+*.tmp
+*.log

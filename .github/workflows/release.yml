@@ -1,0 +1,74 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [linux, darwin]
+        goarch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Build
+        run: |
+          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build \
+            -ldflags "-X internal/version.Version=${GITHUB_REF_NAME#v} \
+                      -X internal/version.Commit=$GITHUB_SHA \
+                      -X internal/version.BuildDate=$(date -u +%Y-%m-%d)" \
+            -o taskcapsule ./cmd/taskcapsule
+
+      - name: Package
+        run: |
+          tar czf taskcapsule_${GITHUB_REF_NAME#v}_${{ matrix.goos }}_${{ matrix.goarch }}.tar.gz taskcapsule
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: taskcapsule_${{ matrix.goos }}_${{ matrix.goarch }}
+          path: "*.tar.gz"
+
+  release-windows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Build
+        run: |
+          GOOS=windows GOARCH=amd64 go build \
+            -ldflags "-X internal/version.Version=${GITHUB_REF_NAME#v} \
+                      -X internal/version.Commit=$GITHUB_SHA \
+                      -X internal/version.BuildDate=$(date -u +%Y-%m-%d)" \
+            -o taskcapsule.exe ./cmd/taskcapsule
+
+      - name: Package
+        run: |
+          zip taskcapsule_${GITHUB_REF_NAME#v}_windows_amd64.zip taskcapsule.exe
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: taskcapsule_windows_amd64
+          path: "*.zip"
+
+  checksums:
+    needs: [release, release-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+      - run: sha256sum taskcapsule_*/taskcapsule_*.tar.gz taskcapsule_*/taskcapsule_*.zip > checksums.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: checksums
+          path: checksums.txt
