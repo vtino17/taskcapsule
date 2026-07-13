@@ -117,28 +117,6 @@ CLI -> Application Layer -> Git / Process / State / Health / Ports
 
 Each component lives in `internal/` with clear interfaces.
 
-## Roadmap
-
-### v0.1 (MVP)
-- [x] init, start, pause, resume
-- [x] list, status, note, where
-- [x] check, logs, handoff, delete, doctor, version
-- [x] Git worktree lifecycle
-- [x] Process lifecycle (Unix process groups)
-- [x] Dynamic port allocation
-- [x] Health checks (process, TCP, HTTP)
-- [x] Atomic state store with locking
-- [x] Handoff report generation
-- [x] Secret redaction
-
-### Future
-- Local reverse proxy with `.localhost` URLs
-- Docker Compose integration
-- Editor integration
-- Capsule export/import
-- GitHub issue integration
-- Shell completion
-
 ## License
 
 Apache 2.0
