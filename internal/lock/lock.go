@@ -88,10 +88,8 @@ func readLock(path string) (*LockData, error) {
 	return &l, nil
 }
 
+// isAlive checks if a process with the given PID is running.
+// Platform-specific implementations in isAlive_unix.go and isAlive_windows.go.
 func isAlive(pid int) bool {
-	proc, err := os.FindProcess(pid)
-	if err != nil {
-		return false
-	}
-	return proc.Signal(os.Interrupt) == nil
+	return isProcessAlive(pid)
 }

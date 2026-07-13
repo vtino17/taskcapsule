@@ -22,12 +22,10 @@ coverage.out
 Thumbs.db
 
 # State / temp
-.taskcapsule/
 dev/
+.taskcapsule/
 .env
 .env.*
 !.env.example
-
-# Temp
 *.tmp
 *.log

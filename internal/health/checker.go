@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -72,7 +73,21 @@ func checkProcess(cfg Config) Result {
 	if cfg.PID <= 0 {
 		return Result{OK: false, Error: "no PID"}
 	}
-	// Process check is delegated to process.IsAlive
+
+	// Wait for grace period to see if process stays alive
+	time.Sleep(500 * time.Millisecond)
+
+	// Try to find process; if it exited, health check fails
+	proc, err := os.FindProcess(cfg.PID)
+	if err != nil {
+		return Result{OK: false, Error: fmt.Sprintf("process %d not found", cfg.PID)}
+	}
+
+	// Signal 0 checks existence on Unix; on Windows FindProcess always succeeds
+	if proc.Signal(os.Interrupt) != nil {
+		return Result{OK: false, Error: fmt.Sprintf("process %d exited", cfg.PID)}
+	}
+
 	return Result{OK: true}
 }
 
