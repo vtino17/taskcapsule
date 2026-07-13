@@ -1,15 +1,8 @@
 # Build
-dist/
-bin/
-/taskcapsule
-/taskcapsule.exe
-
-# Go
-vendor/
-*.test
-*.out
-coverage.out
-*.prof
+/devhibernate
+/devhibernate.exe
+/cmd/devhibernate/devhibernate
+/cmd/devhibernate/devhibernate.exe
 
 # IDE
 .vscode/
@@ -21,11 +14,8 @@ coverage.out
 .DS_Store
 Thumbs.db
 
-# State / temp
-dev/
-.taskcapsule/
-.env
-.env.*
-!.env.example
+# Go
+vendor/
+
+# Temp
 *.tmp
-*.log

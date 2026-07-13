@@ -226,26 +226,49 @@ func startServices(cfg *config.Config, stateBase, repoID, slug, worktreePath str
 
 		// Health check
 		if svcCfg.Health != nil {
-			hcCfg := health.Config{
-				Type:           svcCfg.Health.Type,
-				URL:            resolvePortVar(svcCfg.Health.URL, env.Ports),
-				Host:           svcCfg.Health.Host,
-				Port:           resolvePortVar(svcCfg.Health.Port, env.Ports),
-				ExpectedStatus: svcCfg.Health.ExpectedStatus,
-				TimeoutSeconds: svcCfg.Health.TimeoutSeconds,
-				PID:            pid,
-				ProcessGroup:   pgid,
-			}
+			// Handle process-type health checks directly to avoid zombie race.
+			if svcCfg.Health.Type == "process" {
+				done := make(chan struct{})
+				go func() {
+					cmd.Wait()
+					close(done)
+				}()
 
-			if hcCfg.TimeoutSeconds <= 0 {
-				hcCfg.TimeoutSeconds = cfg.Defaults.HealthTimeoutSeconds
-			}
+				timeout := time.Duration(svcCfg.Health.TimeoutSeconds) * time.Second
+				if timeout <= 0 {
+					timeout = time.Duration(cfg.Defaults.HealthTimeoutSeconds) * time.Second
+				}
 
-			result := health.Check(hcCfg)
-			if !result.OK {
-				return started, nil, fmt.Errorf(
-					"service %s failed health check\n\nHealth type: %s\nReason: %s\nLog: %s",
-					svcName, hcCfg.Type, result.Error, logFile)
+				select {
+				case <-done:
+					return started, nil, fmt.Errorf(
+						"service %s exited before becoming healthy\n\nLog: %s",
+						svcName, logFile)
+				case <-time.After(500 * time.Millisecond):
+					// Process stayed alive past grace period - healthy
+				}
+			} else {
+				hcCfg := health.Config{
+					Type:           svcCfg.Health.Type,
+					URL:            resolvePortVar(svcCfg.Health.URL, env.Ports),
+					Host:           svcCfg.Health.Host,
+					Port:           resolvePortVar(svcCfg.Health.Port, env.Ports),
+					ExpectedStatus: svcCfg.Health.ExpectedStatus,
+					TimeoutSeconds: svcCfg.Health.TimeoutSeconds,
+					PID:            pid,
+					ProcessGroup:   pgid,
+				}
+
+				if hcCfg.TimeoutSeconds <= 0 {
+					hcCfg.TimeoutSeconds = cfg.Defaults.HealthTimeoutSeconds
+				}
+
+				result := health.Check(hcCfg)
+				if !result.OK {
+					return started, nil, fmt.Errorf(
+						"service %s failed health check\n\nHealth type: %s\nReason: %s\nLog: %s",
+						svcName, hcCfg.Type, result.Error, logFile)
+				}
 			}
 		}
 
