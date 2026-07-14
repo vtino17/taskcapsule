@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # TaskCapsule Launch Kit
 
 This file contains ready-to-publish launch copy. Replace `[REPOSITORY LINK]` and `[DEMO VIDEO]` before posting.
@@ -193,6 +194,53 @@ Target duration: 15–20 seconds.
 ```bash
 taskcapsule start feature-checkout
 taskcapsule note feature-checkout "Fix retry assertion next"
+=======
+# Launch Kit
+
+## One-liner
+
+Pause one coding task. Handle the interruption. Resume without losing your place.
+
+## Positioning
+
+TaskCapsule is a local-first CLI that groups Git worktree, development processes, ports, logs, notes, checks, and handoff into one resumable coding task.
+
+## Key facts
+
+- No cloud account required
+- No daemon process
+- No API keys
+- No AI dependency
+- No automatic Git mutations (commit, stash, reset, merge, push)
+- Written in Go
+- Linux and macOS fully supported
+- Windows process-tree management is experimental
+- Apache 2.0 license
+
+## Target audience
+
+Software developers who frequently switch between features, hotfixes, reviews, and experiments.
+
+## Problem statement
+
+Switching Git branches is easy. Reconstructing the complete coding task is not:
+- Which dev servers were running?
+- Which ports?
+- What was the last test result?
+- What was I about to do next?
+
+## Solution
+
+```
+start → work → pause → switch → resume → handoff → delete safely
+```
+
+## Example
+
+```bash
+taskcapsule start feature-checkout
+taskcapsule note feature-checkout "Continue retry test next"
+>>>>>>> 0fbb5fc (docs: add campaign docs, update README with demo and badges)
 taskcapsule pause feature-checkout
 
 taskcapsule start urgent-hotfix
@@ -202,6 +250,7 @@ taskcapsule resume feature-checkout
 taskcapsule where feature-checkout
 ```
 
+<<<<<<< HEAD
 Suggested overlay:
 
 ```text
@@ -232,3 +281,29 @@ For the first launch, prioritize:
 - first external contributor
 
 Stars are useful distribution signals, but they are not proof that the product is solving the problem.
+=======
+## Commands
+
+| Command     | Description                          |
+|-------------|--------------------------------------|
+| `init`      | Create `.taskcapsule.json`           |
+| `start`     | Create capsule, worktree, services   |
+| `pause`     | Stop services, release resources     |
+| `resume`    | Restart services, restore context    |
+| `list`      | List capsules                        |
+| `status`    | Show detailed capsule state          |
+| `note`      | Save context note                    |
+| `where`     | Show where you left off              |
+| `check`     | Run and record a validation command  |
+| `logs`      | View service logs                    |
+| `handoff`   | Generate Markdown handoff report     |
+| `delete`    | Remove capsule and worktree safely   |
+| `doctor`    | Diagnose local state                 |
+| `version`   | Show build information               |
+
+## Channels
+
+- GitHub: https://github.com/vtino17/taskcapsule
+- X (primary): https://x.com/cyberfix17/status/2076837216350048637
+- Feedback issue: https://github.com/vtino17/taskcapsule/issues/1
+>>>>>>> 0fbb5fc (docs: add campaign docs, update README with demo and badges)

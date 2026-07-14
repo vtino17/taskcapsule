@@ -1,5 +1,6 @@
 # TaskCapsule
 
+<<<<<<< HEAD
 > **Pause one coding task. Handle the interruption. Resume without losing your place.**
 
 [![CI](https://github.com/vtino17/taskcapsule/actions/workflows/ci.yml/badge.svg)](https://github.com/vtino17/taskcapsule/actions/workflows/ci.yml)
@@ -22,12 +23,69 @@ taskcapsule start urgent-hotfix
 # Continue the original task later
 taskcapsule resume payment-timeout
 taskcapsule where payment-timeout
+=======
+> Pause one coding task. Handle the interruption. Resume without losing your place.
+
+[![Go](https://img.shields.io/github/go-mod/go-version/vtino17/taskcapsule)](https://github.com/vtino17/taskcapsule)
+[![CI](https://github.com/vtino17/taskcapsule/actions/workflows/ci.yml/badge.svg)](https://github.com/vtino17/taskcapsule/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/vtino17/taskcapsule)](https://github.com/vtino17/taskcapsule/releases)
+[![License](https://img.shields.io/github/license/vtino17/taskcapsule)](https://github.com/vtino17/taskcapsule/blob/main/LICENSE)
+
+TaskCapsule is a local-first CLI that turns a coding task into a resumable **capsule**: an isolated Git worktree plus its development processes, ports, logs, notes, and latest check result.
+
+No cloud account. No daemon. No API key. No AI model. No automatic commit, stash, reset, or push.
+
+```
+taskcapsule start feature-checkout
+taskcapsule note feature-checkout "Continue retry test next"
+taskcapsule pause feature-checkout
+
+taskcapsule start urgent-hotfix
+taskcapsule pause urgent-hotfix
+
+taskcapsule resume feature-checkout
+taskcapsule where feature-checkout
+```
+
+## Terminal demo
+
+```
+$ taskcapsule start feature-checkout --no-services
+Capsule started: feature-checkout
+Branch:    task/feature-checkout
+Status:    running
+
+$ taskcapsule note feature-checkout "Continue retry test next"
+Note saved for feature-checkout.
+
+$ taskcapsule pause feature-checkout
+Capsule paused: feature-checkout
+Resources released.
+
+$ taskcapsule start urgent-hotfix --no-services
+Capsule started: urgent-hotfix
+
+$ taskcapsule pause urgent-hotfix
+Capsule paused: urgent-hotfix
+Resources released.
+
+$ taskcapsule resume feature-checkout
+Capsule resumed: feature-checkout
+Last note:
+  Continue retry test next
+
+$ taskcapsule where feature-checkout
+You were working on: feature-checkout
+Last note:
+  Continue retry test next
+>>>>>>> 0fbb5fc (docs: add campaign docs, update README with demo and badges)
 ```
 
 ## The problem
 
 Switching branches is easy. Reconstructing the whole task is not.
 
+<<<<<<< HEAD
 A normal interruption often means remembering:
 
 - which worktree and branch belong to the task
@@ -57,18 +115,27 @@ Those tools remain useful. TaskCapsule coordinates the task-level lifecycle arou
 ## Install
 
 ### Go
+=======
+## Install
+>>>>>>> 0fbb5fc (docs: add campaign docs, update README with demo and badges)
 
 ```bash
 go install github.com/vtino17/taskcapsule/cmd/taskcapsule@latest
 ```
 
+<<<<<<< HEAD
 ### Release binary
 
 Download the binary for Linux, macOS, or Windows from [GitHub Releases](https://github.com/vtino17/taskcapsule/releases).
+=======
+Or download a binary from [GitHub Releases](https://github.com/vtino17/taskcapsule/releases).
+>>>>>>> 0fbb5fc (docs: add campaign docs, update README with demo and badges)
 
 Linux and macOS are fully supported in v0.1. Windows process-tree management is experimental.
 
 ## Try it in 60 seconds
+
+Inside an existing Git repository:
 
 Inside an existing Git repository:
 
@@ -135,12 +202,36 @@ Create `.taskcapsule.json` with `taskcapsule init`.
 }
 ```
 
+<<<<<<< HEAD
 See [configuration documentation](docs/configuration.md) for the full schema.
 
 ## Safety by default
+=======
+## Why not just use Git worktree, tmux, or Docker Compose?
+
+Those tools remain useful. TaskCapsule coordinates the task-level lifecycle around them.
+
+| Tool | Responsibility |
+|------|---------------|
+| Git worktree | Branch and working directory isolation |
+| tmux | Terminal sessions |
+| Docker Compose | Containerized services |
+| TaskCapsule | Worktree, local processes, ports, logs, notes, checks, and handoff as one task |
+
+## Safety by design
+
+- Never automatically commits, stashes, resets, merges, rebases, or pushes
+- Refuses to delete a dirty worktree unless `--force` is explicit
+- Keeps the Git branch after a capsule is deleted
+- Stores state atomically with restrictive permissions
+- Never persists inherited environment variable values
+- Redacts likely secrets from generated handoff reports
+- Rolls back already-started services when a later service fails its health check
+>>>>>>> 0fbb5fc (docs: add campaign docs, update README with demo and badges)
 
 TaskCapsule is intentionally conservative around source code:
 
+<<<<<<< HEAD
 - never automatically commits, stashes, resets, merges, rebases, or pushes
 - refuses to delete a dirty worktree unless `--force` is explicit
 - keeps the Git branch after a capsule is deleted
@@ -148,9 +239,17 @@ TaskCapsule is intentionally conservative around source code:
 - never persists inherited environment-variable values
 - redacts likely secrets from generated handoff reports
 - rolls back already-started services when a later service fails its health check
+=======
+| Platform | Status |
+|----------|--------|
+| Linux | Full |
+| macOS | Full |
+| Windows | Experimental (no Job Objects yet) |
+>>>>>>> 0fbb5fc (docs: add campaign docs, update README with demo and badges)
 
 See [security documentation](docs/security.md).
 
+<<<<<<< HEAD
 ## How it works
 
 ```text
@@ -183,6 +282,13 @@ Open an issue and describe:
 3. which commands or tools you currently use
 
 Contributions are welcome. Start with the architecture and testing docs, then check open issues for small, verifiable improvements.
+=======
+```
+CLI → Application Layer → Git / Process / State / Health / Ports
+```
+
+Each component lives under `internal/` behind focused interfaces.
+>>>>>>> 0fbb5fc (docs: add campaign docs, update README with demo and badges)
 
 ## License
 
