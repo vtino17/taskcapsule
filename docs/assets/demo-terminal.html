@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #1a1a2e; display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: 'Courier New', monospace; }
+.terminal { background: #0d0d1a; border-radius: 8px; padding: 20px; width: 720px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
+.title-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #1a1a3e; }
+.dot { width: 12px; height: 12px; border-radius: 50%; }
+.dot-r { background: #ff5f56; }
+.dot-y { background: #ffbd2e; }
+.dot-g { background: #27c93f; }
+.title-text { color: #666; font-size: 12px; margin-left: 8px; }
+.line { color: #e0e0e0; font-size: 13px; line-height: 1.6; white-space: pre-wrap; word-break: break-all; }
+.prompt { color: #00ff88; }
+.cmd { color: #e0e0e0; }
+.output { color: #888; }
+.note { color: #ffaa00; }
+.highlight { color: #66bfff; }
+.spacer { height: 8px; }
+</style>
+</head>
+<body>
+<div class="terminal">
+<div class="title-bar">
+  <div class="dot dot-r"></div>
+  <div class="dot dot-y"></div>
+  <div class="dot dot-g"></div>
+  <span class="title-text">PowerShell — taskcapsule demo</span>
+</div>
+
+<div class="line"><span class="prompt">PS&gt;</span> <span class="cmd">taskcapsule start feature-checkout --no-services</span></div>
+<div class="line"><span class="output">Capsule started: feature-checkout</span></div>
+<div class="line"><span class="output">Branch:    task/feature-checkout</span></div>
+<div class="line"><span class="output">Status:    running</span></div>
+<div class="spacer"></div>
+
+<div class="line"><span class="prompt">PS&gt;</span> <span class="cmd">taskcapsule note feature-checkout "Continue retry test next"</span></div>
+<div class="line"><span class="output">Note saved for feature-checkout.</span></div>
+<div class="spacer"></div>
+
+<div class="line"><span class="prompt">PS&gt;</span> <span class="cmd">taskcapsule pause feature-checkout</span></div>
+<div class="line"><span class="output">Capsule paused: feature-checkout</span></div>
+<div class="line"><span class="output">Resources released.</span></div>
+<div class="spacer"></div>
+
+<div class="line"><span class="prompt">PS&gt;</span> <span class="cmd">taskcapsule start urgent-hotfix --no-services</span></div>
+<div class="line"><span class="output">Capsule started: urgent-hotfix</span></div>
+<div class="spacer"></div>
+
+<div class="line"><span class="prompt">PS&gt;</span> <span class="cmd">taskcapsule pause urgent-hotfix</span></div>
+<div class="line"><span class="output">Capsule paused: urgent-hotfix</span></div>
+<div class="spacer"></div>
+
+<div class="line"><span class="prompt">PS&gt;</span> <span class="cmd">taskcapsule resume feature-checkout</span></div>
+<div class="line"><span class="output">Capsule resumed: feature-checkout</span></div>
+<div class="line"><span class="output">Last note:</span></div>
+<div class="line"><span class="output">  Continue retry test next</span></div>
+<div class="spacer"></div>
+
+<div class="line"><span class="prompt">PS&gt;</span> <span class="cmd">taskcapsule where feature-checkout</span></div>
+<div class="line"><span class="output">You were working on: feature-checkout</span></div>
+<div class="line"><span class="output">Last note:</span></div>
+<div class="line"><span class="output">  Continue retry test next</span></div>
+</div>
+</div>
+</body>
+</html>
