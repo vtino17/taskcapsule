@@ -25,7 +25,7 @@ taskcapsule where feature-checkout
 
 ## Demo
 
-![TaskCapsule workflow demo](docs/assets/taskcapsule-demo.png)
+![TaskCapsule workflow demo](docs/assets/taskcapsule-demo.gif)
 
 ## Problem
 
