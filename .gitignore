@@ -1,8 +1,15 @@
 # Build
-/devhibernate
-/devhibernate.exe
-/cmd/devhibernate/devhibernate
-/cmd/devhibernate/devhibernate.exe
+dist/
+bin/
+/taskcapsule
+/taskcapsule.exe
+*.test
+*.out
+coverage.out
+*.prof
+
+# Dev artifact
+/dev/null
 
 # IDE
 .vscode/
@@ -14,8 +21,12 @@
 .DS_Store
 Thumbs.db
 
-# Go
-vendor/
+# State
+.taskcapsule/
+.env
+.env.*
+!.env.example
 
 # Temp
 *.tmp
+*.log
