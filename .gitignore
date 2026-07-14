@@ -11,6 +11,9 @@ coverage.out
 # Dev artifact
 /dev/null
 
+# Demo generator script
+/generate-demo.ps1
+
 # IDE
 .vscode/
 .idea/
