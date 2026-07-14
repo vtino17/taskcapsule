@@ -4,14 +4,32 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
-  release:
+  build:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        goos: [linux, darwin]
-        goarch: [amd64, arm64]
+        include:
+          - goos: linux
+            goarch: amd64
+            ext: ""
+          - goos: linux
+            goarch: arm64
+            ext: ""
+          - goos: darwin
+            goarch: amd64
+            ext: ""
+          - goos: darwin
+            goarch: arm64
+            ext: ""
+          - goos: windows
+            goarch: amd64
+            ext: ".exe"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -21,54 +39,52 @@ jobs:
       - name: Build
         run: |
           GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build \
-            -ldflags "-X internal/version.Version=${GITHUB_REF_NAME#v} \
-                      -X internal/version.Commit=$GITHUB_SHA \
-                      -X internal/version.BuildDate=$(date -u +%Y-%m-%d)" \
-            -o taskcapsule ./cmd/taskcapsule
+            -trimpath \
+            -ldflags "-s -w -X github.com/vtino17/taskcapsule/internal/version.Version=${GITHUB_REF_NAME#v} \
+                      -X github.com/vtino17/taskcapsule/internal/version.Commit=$GITHUB_SHA \
+                      -X github.com/vtino17/taskcapsule/internal/version.BuildDate=$(date -u +%Y-%m-%d)" \
+            -o taskcapsule${{ matrix.ext }} ./cmd/taskcapsule
 
-      - name: Package
-        run: |
-          tar czf taskcapsule_${GITHUB_REF_NAME#v}_${{ matrix.goos }}_${{ matrix.goarch }}.tar.gz taskcapsule
+          artifact="taskcapsule_${GITHUB_REF_NAME#v}_${{ matrix.goos }}_${{ matrix.goarch }}"
+          mkdir -p "$artifact"
+          cp taskcapsule${{ matrix.ext }} LICENSE README.md "$artifact/"
 
-      - name: Upload
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            cd "$artifact" && zip -q "../${artifact}.zip" taskcapsule.exe LICENSE README.md
+          else
+            tar czf "${artifact}.tar.gz" -C "$artifact" taskcapsule${{ matrix.ext }} LICENSE README.md
+          fi
+
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: taskcapsule_${{ matrix.goos }}_${{ matrix.goarch }}
-          path: "*.tar.gz"
+          name: ${{ matrix.goos }}_${{ matrix.goarch }}
+          path: taskcapsule_*.tar.gz taskcapsule_*.zip
 
-  release-windows:
+  release:
+    needs: [build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.21'
-
-      - name: Build
-        run: |
-          GOOS=windows GOARCH=amd64 go build \
-            -ldflags "-X internal/version.Version=${GITHUB_REF_NAME#v} \
-                      -X internal/version.Commit=$GITHUB_SHA \
-                      -X internal/version.BuildDate=$(date -u +%Y-%m-%d)" \
-            -o taskcapsule.exe ./cmd/taskcapsule
-
-      - name: Package
-        run: |
-          zip taskcapsule_${GITHUB_REF_NAME#v}_windows_amd64.zip taskcapsule.exe
-
-      - name: Upload
-        uses: actions/upload-artifact@v4
-        with:
-          name: taskcapsule_windows_amd64
-          path: "*.zip"
-
-  checksums:
-    needs: [release, release-windows]
-    runs-on: ubuntu-latest
-    steps:
       - uses: actions/download-artifact@v4
-      - run: sha256sum taskcapsule_*/taskcapsule_*.tar.gz taskcapsule_*/taskcapsule_*.zip > checksums.txt
-      - uses: actions/upload-artifact@v4
         with:
-          name: checksums
-          path: checksums.txt
+          path: artifacts
+          merge-multiple: true
+
+      - name: Generate checksums
+        run: |
+          cd artifacts
+          sha256sum *.tar.gz *.zip > checksums.txt 2>/dev/null || true
+          ls -la
+
+      - name: Create Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            artifacts/*.tar.gz artifacts/*.zip artifacts/checksums.txt \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "TaskCapsule $GITHUB_REF_NAME" \
+            --notes "See the [CHANGELOG](https://github.com/$GITHUB_REPOSITORY/blob/main/CHANGELOG.md) for details." \
+            --verify-tag \
+            --latest
