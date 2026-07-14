@@ -4,13 +4,26 @@ on:
   push:
     tags:
       - 'v*'
-  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate tag and assets
+        run: |
+          VERSION="${{ github.ref_name }}"
+          echo "VERSION=$VERSION"
+          [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Invalid tag format: $VERSION"; exit 1; }
+          test -f LICENSE || { echo "LICENSE file missing"; exit 1; }
+          test -f README.md || { echo "README.md file missing"; exit 1; }
+          echo "Tag and assets validated"
+
   build:
+    needs: [validate]
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -36,7 +49,7 @@ jobs:
         with:
           go-version: '1.21'
 
-      - name: Build
+      - name: Build and package
         run: |
           GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build \
             -trimpath \
@@ -74,7 +87,7 @@ jobs:
       - name: Generate checksums
         run: |
           cd artifacts
-          sha256sum *.tar.gz *.zip > checksums.txt 2>/dev/null || true
+          sha256sum *.tar.gz *.zip > checksums.txt
           ls -la
 
       - name: Create Release
