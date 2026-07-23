@@ -14,19 +14,34 @@ func init() {
 func commandNames() []string {
 	var names []string
 	for _, c := range commands {
-		if c.name == "completion" {
-			continue
-		}
 		names = append(names, c.name)
 	}
 	sort.Strings(names)
-	return names
+	return removeDuplicates(names)
+}
+
+func removeDuplicates(items []string) []string {
+	seen := make(map[string]bool, len(items))
+	result := make([]string, 0, len(items))
+	for _, item := range items {
+		if !seen[item] {
+			seen[item] = true
+			result = append(result, item)
+		}
+	}
+	return result
 }
 
 func handleCompletion(args []string) int {
 	if len(args) == 0 {
 		fmt.Fprintln(os.Stderr, "Usage: taskcapsule completion <shell>")
 		fmt.Fprintln(os.Stderr, "Supported shells: bash, zsh, fish, powershell")
+		return 2
+	}
+
+	if len(args) > 1 {
+		fmt.Fprintf(os.Stderr, "Error: too many arguments: %s\n", strings.Join(args[1:], " "))
+		fmt.Fprintln(os.Stderr, "Usage: taskcapsule completion <shell>")
 		return 2
 	}
 

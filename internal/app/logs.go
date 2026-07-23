@@ -8,6 +8,8 @@ import (
 	"github.com/vtino17/taskcapsule/internal/git"
 )
 
+var defaultLogReader = DefaultLogReader
+
 func ShowLogs(name string, opts LogOptions) ([]byte, error) {
 	root, err := findGitRoot()
 	if err != nil {
@@ -57,34 +59,20 @@ func ShowLogs(name string, opts LogOptions) ([]byte, error) {
 }
 
 func readTail(path string, lines int) ([]byte, error) {
-	data, err := os.ReadFile(path)
+	if lines <= 0 {
+		lines = defaultTailLines
+	}
+	reader := &LogReader{MaxBytes: defaultTailBytes, MaxLines: lines}
+	data, err := reader.ReadTail(path)
 	if err != nil {
 		return nil, err
 	}
 
-	// Count lines
-	lineCount := 0
-	for _, b := range data {
-		if b == '\n' {
-			lineCount++
-		}
+	info, err := os.Stat(path)
+	if err == nil && info.Size() > defaultTailBytes {
+		msg := fmt.Sprintf("... (truncated, showing last %d bytes / %d lines) ...\n", defaultTailBytes, lines)
+		data = append([]byte(msg), data...)
 	}
 
-	if lineCount <= lines {
-		return data, nil
-	}
-
-	// Find starting position
-	skipLines := lineCount - lines
-	pos := 0
-	for skipLines > 0 && pos < len(data) {
-		if data[pos] == '\n' {
-			skipLines--
-		}
-		pos++
-	}
-	if pos < len(data) {
-		return data[pos:], nil
-	}
 	return data, nil
 }

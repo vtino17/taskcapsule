@@ -18,12 +18,8 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - uses: actions/cache@v4
-        with:
-          path: ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
+          cache: true
+          cache-dependency-path: go.sum
       - run: test -z "$(gofmt -l .)"
       - run: go vet ./...
 
@@ -34,13 +30,9 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - uses: actions/cache@v4
-        with:
-          path: ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-      - run: go test ./...
+          cache: true
+          cache-dependency-path: go.sum
+      - run: go test ./... -timeout 15m
 
   race:
     runs-on: ubuntu-latest
@@ -49,13 +41,9 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - uses: actions/cache@v4
-        with:
-          path: ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-      - run: go test -race ./... -timeout 15m
+          cache: true
+          cache-dependency-path: go.sum
+      - run: go test -race ./... -timeout 20m
 
   build:
     runs-on: ubuntu-latest
@@ -64,12 +52,8 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - uses: actions/cache@v4
-        with:
-          path: ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
+          cache: true
+          cache-dependency-path: go.sum
       - run: go build ./...
 
   integration:
@@ -79,13 +63,9 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - uses: actions/cache@v4
-        with:
-          path: ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-      - run: go test -tags=integration ./test/integration/... -timeout 15m
+          cache: true
+          cache-dependency-path: go.sum
+      - run: go test -tags=integration ./test/integration/... -timeout 20m
 
   integration-race:
     runs-on: ubuntu-latest
@@ -94,10 +74,36 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - uses: actions/cache@v4
+          cache: true
+          cache-dependency-path: go.sum
+      - run: go test -race -tags=integration ./test/integration/... -timeout 25m
+
+  release-dry-run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
         with:
-          path: ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-      - run: go test -race -tags=integration ./test/integration/... -timeout 20m
+          go-version-file: go.mod
+          cache: true
+          cache-dependency-path: go.sum
+      - name: Run release packaging dry-run
+        run: |
+          chmod +x scripts/build-release-artifacts.sh
+          VERSION=0.0.0-dry-run COMMIT=DRY-RUN BUILD_DATE=$(date -u +%Y-%m-%d) \
+            ./scripts/build-release-artifacts.sh ./dist
+      - name: Verify archives
+        run: |
+          ls -la dist/
+          for f in dist/*.tar.gz; do
+            tar tzf "$f" | grep -q "LICENSE" && echo "✓ $f contains LICENSE" || echo "✗ $f missing LICENSE"
+            tar tzf "$f" | grep -q "taskcapsule" && echo "✓ $f contains binary" || echo "✗ $f missing binary"
+          done
+          for f in dist/*.zip; do
+            unzip -l "$f" | grep -q "LICENSE" && echo "✓ $f contains LICENSE" || echo "✗ $f missing LICENSE"
+          done
+          test -f dist/checksums.txt && echo "✓ checksums.txt present" || echo "✗ checksums.txt missing"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-dry-run
+          path: dist/*

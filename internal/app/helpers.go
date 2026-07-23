@@ -74,6 +74,9 @@ func setupEnv(cmd *exec.Cmd, svcEnv *serviceEnv) {
 }
 
 func exitCodeFromError(err error) int {
+	if err == nil {
+		return ExitSuccess
+	}
 	// Simple heuristics based on error message
 	msg := err.Error()
 	if strings.Contains(msg, "capsule not found") {
