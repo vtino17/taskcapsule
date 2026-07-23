@@ -53,5 +53,3 @@ func TestStopProcessGroupZero(t *testing.T) {
 	}()
 	StopProcessGroup(0, 1)
 }
-
-
