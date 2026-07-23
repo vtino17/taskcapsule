@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.1.1] - 2026-07-23
+
+### Fixed
+- Non-destructive process existence checks using signal 0
+- Deterministic process tests without external `sleep` or `sh` dependencies
+- Strict release archive and checksum validation
+- Shell completion command coverage and deduplication
+- Bounded service log reading
+
+### Changed
+- CI and release workflows use the Go version declared in `go.mod`
+- Release packaging uses the shared `scripts/build-release-artifacts.sh`
+- Removed the unused duplicate `internal/doctor` package
+
 ## [0.1.0] - 2026-07-14
 
 ### Added
