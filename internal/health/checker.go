@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"syscall"
 	"time"
 )
 
@@ -84,7 +85,7 @@ func checkProcess(cfg Config) Result {
 	}
 
 	// Signal 0 checks existence on Unix; on Windows FindProcess always succeeds
-	if proc.Signal(os.Interrupt) != nil {
+	if proc.Signal(syscall.Signal(0x0)) != nil {
 		return Result{OK: false, Error: fmt.Sprintf("process %d exited", cfg.PID)}
 	}
 

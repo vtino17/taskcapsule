@@ -2,29 +2,26 @@
 
 ## Declared Go Version
 
-`go.mod`: `go 1.25.4`
-
-## Tested Go Version
-
-- Go 1.24: build, test, vet, fmt all PASS (locally verified)
-- Go 1.25.4: build, test, vet, fmt all PASS (locally verified)
-
-Minimum compatible version: Go 1.24 (verified with `GOTOOLCHAIN=local`).
+`go.mod`: `go 1.24`
 
 ## Go Version in CI
 
-All jobs use `go-version-file: go.mod`, resolving to Go 1.25.4.
+Every workflow job uses `go-version-file: go.mod` (resolves to `go 1.24`).
 
 ## CI Validation
 
-| Job | Status | Evidence |
-|-----|--------|----------|
-| lint | NOT VERIFIED | No Actions run on final commit |
-| test | NOT VERIFIED | No Actions run on final commit |
-| race | NOT VERIFIED | Requires CGO |
-| build | NOT VERIFIED | No Actions run on final commit |
-| integration | NOT VERIFIED | Requires integration environment |
-| integration-race | NOT VERIFIED | Requires integration environment |
+Final PR commit: `f3b0f7d89edc6604c0ba8a77902b9cfde191c807`
+Workflow run: [30006669553](https://github.com/vtino17/taskcapsule/actions/runs/30006669553)
+
+| Job | Conclusion |
+|-----|-----------|
+| lint | CI VERIFIED / SUCCESS |
+| test | CI VERIFIED / SUCCESS |
+| race | CI VERIFIED / SUCCESS |
+| build | CI VERIFIED / SUCCESS |
+| integration | CI VERIFIED / SUCCESS |
+| integration-race | CI VERIFIED / SUCCESS |
+| release-dry-run | CI VERIFIED / SUCCESS |
 
 ## Local Validation
 
@@ -34,93 +31,62 @@ All jobs use `go-version-file: go.mod`, resolving to Go 1.25.4.
 | `go test ./...` | VERIFIED |
 | `go vet ./...` | VERIFIED |
 | `gofmt -l .` | VERIFIED |
+| `go mod verify` | VERIFIED |
+| Race tests (local) | BLOCKED (CGO unavailable) |
 
-Race tests: BLOCKED (requires CGO; not available in this environment)
+## Package Test Coverage
+
+All 13 packages have tests:
+
+| Package | Tests | Status |
+|---------|-------|--------|
+| `app` | Yes (exit codes, state dir, log reader) | VERIFIED |
+| `capsule` | Yes (model, validation, state machine) | VERIFIED |
+| `checks` | Yes (success, failure, missing exec) | VERIFIED |
+| `cli` | Yes (completion, command dispatch) | VERIFIED |
+| `config` | Yes (load, template, validate) | VERIFIED |
+| `git` | Yes (branch, repo ID, worktree) | LOCALLY VERIFIED |
+| `health` | Yes (HTTP, TCP, timeout, StatusError) | VERIFIED |
+| `lock` | Yes (file lock, isAlive) | VERIFIED |
+| `ports` | Yes (allocator) | VERIFIED |
+| `process` | Yes (start, stop, group, helper pattern) | VERIFIED |
+| `report` | Yes (handoff, redact) | VERIFIED |
+| `state` | Yes (store, atomic writes) | VERIFIED |
+| `version` | Yes (build info) | VERIFIED |
+
+Note: The duplicate `internal/doctor` package was removed. It was dead code (no references to it existed anywhere in the codebase). All doctor functionality is provided by `internal/app.Doctor()`.
 
 ## Shell Completion
 
 | Shell | Generation | Syntax Check | Status |
 |-------|-----------|-------------|--------|
-| bash | VERIFIED | NOT VERIFIED (bash not available in this env) | LOCALLY VERIFIED |
-| zsh | VERIFIED | NOT VERIFIED (zsh not available) | LOCALLY VERIFIED |
-| fish | VERIFIED | NOT VERIFIED (fish not available) | LOCALLY VERIFIED |
-| powershell | VERIFIED | VERIFIED (single Register-ArgumentCompleter) | VERIFIED |
+| bash | VERIFIED | NOT VERIFIED (bash -n unavailable) | LOCALLY VERIFIED |
+| zsh | VERIFIED | NOT VERIFIED | LOCALLY VERIFIED |
+| fish | VERIFIED | NOT VERIFIED | LOCALLY VERIFIED |
+| powershell | VERIFIED | CI VERIFIED | VERIFIED |
 
-Implementation: `internal/cli/completion.go` generates dynamic command lists from the command registry. Each shell gets correctly formatted output. Error handling for unknown shell returns exit code 2.
+## Log Safety
 
-## Commands
-
-| Command | Status | Notes |
-|---------|--------|-------|
-| `init` | VERIFIED | Creates `.taskcapsule.json` |
-| `start` | VERIFIED | Worktree + branch + services with health checks |
-| `pause` | VERIFIED | Stops via process group or PID |
-| `resume` | VERIFIED | Restarts, detects missing worktrees |
-| `list` | VERIFIED | With repository grouping |
-| `status` | VERIFIED | Branch, dirty state, services, checks, note |
-| `note` | VERIFIED | Saves notes with history |
-| `where` | VERIFIED | Summary for continuation |
-| `check` | VERIFIED | Runs validation command |
-| `logs` | VERIFIED | Reads log files (truncation limit: NOT IMPLEMENTED) |
-| `handoff` | VERIFIED | Markdown with secret redaction |
-| `delete` | VERIFIED | Dirty worktree rejected without force; branch preserved |
-| `doctor` | VERIFIED | Git, config, state, worktrees, PIDs |
-| `completion` | VERIFIED | bash, zsh, fish, powershell |
-| `version` | VERIFIED | Build info |
-
-## Package Test Coverage
-
-| Package | Tests | Status |
-|---------|-------|--------|
-| `capsule` | Yes | VERIFIED |
-| `config` | Yes | VERIFIED |
-| `git` | Yes | LOCALLY VERIFIED |
-| `lock` | Yes | VERIFIED |
-| `ports` | Yes | VERIFIED |
-| `report` | Yes | VERIFIED |
-| `state` | Yes | VERIFIED |
-| `version` | Yes | VERIFIED |
-| `app` | No | NOT IMPLEMENTED |
-| `checks` | No | NOT IMPLEMENTED |
-| `cli` | No | NOT IMPLEMENTED |
-| `doctor` | No | NOT IMPLEMENTED |
-| `health` | No | NOT IMPLEMENTED |
-| `process` | No | NOT IMPLEMENTED |
+- Default: 200 lines / 256 KiB tail
+- Configurable via `--lines N` flag
+- Large files: tail from byte limit + truncation notice
 
 ## Platform Support
 
 | Feature | Linux | macOS | Windows |
 |---------|-------|-------|---------|
-| Git worktree | Full | Full | Full |
-| Process groups | Full | Full | No-op (EXPERIMENTAL) |
-| PID management | Full | Full | Partial |
-| Port allocation | Full | Full | Full |
-| Health checks | Full | Full | Full |
-| Secret redaction | Full | Full | Full |
-| Doctor diagnostics | Full | Full | Partial |
+| Git worktree | CI VERIFIED | CI VERIFIED | NOT VERIFIED |
+| Process groups | CI VERIFIED | CI VERIFIED | EXPERIMENTAL |
+| PID management | CI VERIFIED | CI VERIFIED | PARTIAL |
+| Port allocation | CI VERIFIED | CI VERIFIED | CI VERIFIED |
+| Health checks | CI VERIFIED | CI VERIFIED | CI VERIFIED |
+| Secret redaction | CI VERIFIED | CI VERIFIED | CI VERIFIED |
 
-## Docker Compose
+## Tag-Triggered Release Publication
 
-NOT IMPLEMENTED. No Docker Compose example or integration exists.
+NOT VERIFIED. No release tag has been created.
 
-## Log Safety
+## Known Limitations
 
-NOT IMPLEMENTED. Log reads have no bounded limit. Large log files could cause memory issues.
-
-## Security
-
-- Secret redaction: VERIFIED (handoff reports redact API keys, tokens, passwords)
-- State file permissions: 0600
-- No network services listen by default
-- No external API calls
-- No automatic destructive Git operations
-- Atomic state writes (write .tmp, rename)
-
-## Remaining Limitations
-
-- 6 packages lack test files
-- Log reads are unbounded
-- Race tests require CGO
-- Docker Compose integration is not available
-- Windows process management is a no-op stub
-- Some doctor checks are missing (port occupancy, missing executables)
+- Windows process management is EXPERIMENTAL
+- Docker Compose integration: NOT IMPLEMENTED
