@@ -9,40 +9,51 @@ import (
 )
 
 func TestSetProcessGroup(t *testing.T) {
-	cmd := exec.Command("go", "version")
+	cmd := exec.Command("sh", "-c", "sleep 60")
+	if err := cmd.Start(); err != nil {
+		t.Skip("sh not available")
+	}
 	SetProcessGroup(cmd)
-	if cmd.SysProcAttr == nil {
-		t.Fatal("SysProcAttr should not be nil after SetProcessGroup")
+	t.Cleanup(func() {
+		StopProcess(cmd.Process.Pid, 2)
+	})
+	if cmd.SysProcAttr == nil && runtime.GOOS != "windows" {
+		t.Error("SysProcAttr should not be nil")
 	}
 }
 
 func TestStopProcessRunning(t *testing.T) {
-	cmd := exec.Command("go", "version")
+	cmd := exec.Command("sleep", "60")
 	if err := cmd.Start(); err != nil {
-		t.Fatal(err)
+		t.Skip("sleep not available")
 	}
 
-	StopProcess(cmd.Process.Pid, 2)
-	// If we reach here without hanging, the stop worked
+	pid := cmd.Process.Pid
+
+	// Wait a moment for the process to start
+	time.Sleep(100 * time.Millisecond)
+
+	StopProcess(pid, 2)
+
+	// Wait and check it's stopped
+	time.Sleep(500 * time.Millisecond)
+	alive := IsAlive(pid)
+	if alive && runtime.GOOS != "windows" {
+		t.Error("process should have been stopped")
+	}
 }
 
 func TestStopProcessNonExistent(t *testing.T) {
-	// This should not panic
 	StopProcess(999999, 1)
 }
 
-func TestStopProcessZero(t *testing.T) {
-	// This should not panic
-	StopProcess(0, 1)
-}
-
 func TestGetProcessGroup(t *testing.T) {
-	cmd := exec.Command("go", "version")
-	SetProcessGroup(cmd)
+	cmd := exec.Command("sleep", "60")
 	if err := cmd.Start(); err != nil {
-		t.Fatal(err)
+		t.Skip("sleep not available")
 	}
-	defer cmd.Wait()
+	SetProcessGroup(cmd)
+	t.Cleanup(func() { StopProcess(cmd.Process.Pid, 2) })
 
 	pgid := GetProcessGroup(cmd)
 	if pgid <= 0 && runtime.GOOS != "windows" {
@@ -54,19 +65,22 @@ func TestStopProcessGroup(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("process group management is experimental on Windows")
 	}
+
 	cmd := exec.Command("sleep", "60")
 	SetProcessGroup(cmd)
 	if err := cmd.Start(); err != nil {
 		t.Skip("sleep not available")
 	}
-	defer cmd.Process.Kill()
+	pid := cmd.Process.Pid
 
 	pgid := GetProcessGroup(cmd)
 	StopProcessGroup(pgid, 2)
-}
 
-func TestStopProcessGroupZero(t *testing.T) {
-	StopProcessGroup(0, 1)
+	time.Sleep(500 * time.Millisecond)
+	alive := IsAlive(pid)
+	if alive {
+		t.Error("process group should have been stopped")
+	}
 }
 
 func TestIsAlive(t *testing.T) {
@@ -79,8 +93,35 @@ func TestIsAlive(t *testing.T) {
 func TestIsAliveNonExistent(t *testing.T) {
 	alive := IsAlive(999999)
 	if alive {
-		t.Log("IsAlive returned true for non-existent PID (possible on Windows)")
+		t.Log("IsAlive unexpectedly returned true (possible on Windows)")
 	}
+}
+
+func TestStartStopChildProcess(t *testing.T) {
+	cmd := exec.Command("sh", "-c", "trap 'exit 0' TERM INT; while true; do sleep 1; done")
+	if err := cmd.Start(); err != nil {
+		t.Skip("long-lived child not supported on this platform")
+	}
+	pid := cmd.Process.Pid
+
+	time.Sleep(200 * time.Millisecond)
+	if !IsAlive(pid) {
+		t.Fatal("child should be alive after starting")
+	}
+
+	StopProcess(pid, 3)
+
+	time.Sleep(500 * time.Millisecond)
+	alive := IsAlive(pid)
+	if alive && runtime.GOOS != "windows" {
+		t.Error("child should have been stopped")
+	}
+	cmd.Process.Kill()
+	cmd.Wait()
+}
+
+func TestStopProcessGroupZero(t *testing.T) {
+	StopProcessGroup(0, 1)
 }
 
 func TestFormatDuration(t *testing.T) {

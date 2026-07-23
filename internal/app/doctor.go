@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"syscall"
 
 	"github.com/vtino17/taskcapsule/internal/git"
 	"github.com/vtino17/taskcapsule/internal/state"
@@ -101,7 +102,7 @@ func isProcessRunning(pid int) bool {
 	if err != nil {
 		return false
 	}
-	// On Unix, sending signal 0 checks if process exists
-	// On Windows, FindProcess always succeeds
-	return proc.Signal(os.Interrupt) == nil
+	// Signal 0 checks process existence on Unix.
+	// On Windows, FindProcess always succeeds, so this returns true.
+	return proc.Signal(syscall.Signal(0x0)) == nil
 }

@@ -89,5 +89,5 @@ func TestIsProcessRunning(t *testing.T) {
 }
 
 func TestIsProcessRunningNonExistent(t *testing.T) {
-	isProcessRunning(999999)
+	_ = isProcessRunning(999999)
 }

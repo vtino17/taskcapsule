@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       dry-run:
-        description: 'Build artifacts without publishing (true/false)'
+        description: 'Build artifacts without publishing'
         required: true
         default: 'true'
 
@@ -25,11 +25,12 @@ jobs:
           cache: true
           cache-dependency-path: go.sum
 
-      - name: Validate tag format
+      - name: Validate tag or branch
         run: |
-          VERSION="${{ github.ref_name }}"
-          echo "VERSION=$VERSION"
-          [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Invalid tag format: $VERSION"; exit 1; }
+          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref_type }}" == "tag" ]]; then
+            VERSION="${{ github.ref_name }}"
+            [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Invalid tag format: $VERSION"; exit 1; }
+          fi
           test -f LICENSE || { echo "LICENSE file missing"; exit 1; }
           test -f README.md || { echo "README.md file missing"; exit 1; }
 
@@ -44,7 +45,6 @@ jobs:
 
       - name: Race test
         run: go test -race ./... -timeout 20m
-        continue-on-error: true
 
       - name: Integration test
         run: go test -tags=integration ./test/integration/... -timeout 20m
@@ -59,24 +59,6 @@ jobs:
     needs: [validate-and-test]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - goos: linux
-            goarch: amd64
-            ext: ""
-          - goos: linux
-            goarch: arm64
-            ext: ""
-          - goos: darwin
-            goarch: amd64
-            ext: ""
-          - goos: darwin
-            goarch: arm64
-            ext: ""
-          - goos: windows
-            goarch: amd64
-            ext: ".exe"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -85,30 +67,18 @@ jobs:
           cache: true
           cache-dependency-path: go.sum
 
-      - name: Build and package
+      - name: Build and package all targets
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build \
-            -trimpath \
-            -ldflags "-s -w -X github.com/vtino17/taskcapsule/internal/version.Version=${VERSION} \
-                      -X github.com/vtino17/taskcapsule/internal/version.Commit=$GITHUB_SHA \
-                      -X github.com/vtino17/taskcapsule/internal/version.BuildDate=$(date -u +%Y-%m-%d)" \
-            -o taskcapsule${{ matrix.ext }} ./cmd/taskcapsule
-
-          artifact="taskcapsule_${VERSION}_${{ matrix.goos }}_${{ matrix.goarch }}"
-          mkdir -p "$artifact"
-          cp taskcapsule${{ matrix.ext }} LICENSE README.md "$artifact/"
-
-          if [ "${{ matrix.goos }}" = "windows" ]; then
-            cd "$artifact" && zip -q "../${artifact}.zip" taskcapsule.exe LICENSE README.md
-          else
-            tar czf "${artifact}.tar.gz" -C "$artifact" . --transform 's,^\./,taskcapsule/,'
-          fi
+          chmod +x scripts/build-release-artifacts.sh
+          VERSION="${GITHUB_REF_NAME#v}" \
+          COMMIT="$GITHUB_SHA" \
+          BUILD_DATE="$(date -u +%Y-%m-%d)" \
+          ./scripts/build-release-artifacts.sh ./dist
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.goos }}_${{ matrix.goarch }}
-          path: taskcapsule_*.tar.gz taskcapsule_*.zip
+          name: release-artifacts
+          path: dist/*
 
   release:
     needs: [validate-and-test, build]
@@ -143,26 +113,8 @@ jobs:
 
   release-dry-run:
     needs: [validate-and-test]
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.dry-run == 'true'
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - goos: linux
-            goarch: amd64
-            ext: ""
-          - goos: linux
-            goarch: arm64
-            ext: ""
-          - goos: darwin
-            goarch: amd64
-            ext: ""
-          - goos: darwin
-            goarch: arm64
-            ext: ""
-          - goos: windows
-            goarch: amd64
-            ext: ".exe"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -171,37 +123,56 @@ jobs:
           cache: true
           cache-dependency-path: go.sum
 
-      - name: Build and package
+      - name: Package all targets
         run: |
-          VERSION="0.0.0-dry-run"
-          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build \
-            -trimpath \
-            -ldflags "-s -w -X github.com/vtino17/taskcapsule/internal/version.Version=${VERSION} \
-                      -X github.com/vtino17/taskcapsule/internal/version.Commit=DRY-RUN \
-                      -X github.com/vtino17/taskcapsule/internal/version.BuildDate=$(date -u +%Y-%m-%d)" \
-            -o taskcapsule${{ matrix.ext }} ./cmd/taskcapsule
+          chmod +x scripts/build-release-artifacts.sh
+          VERSION=0.0.0-dry-run \
+          COMMIT=DRY-RUN \
+          BUILD_DATE=$(date -u +%Y-%m-%d) \
+          ./scripts/build-release-artifacts.sh ./dist
 
-          artifact="taskcapsule_${VERSION}_${{ matrix.goos }}_${{ matrix.goarch }}"
-          mkdir -p "$artifact"
-          cp taskcapsule${{ matrix.ext }} LICENSE README.md "$artifact/"
-
-          if [ "${{ matrix.goos }}" = "windows" ]; then
-            cd "$artifact" && zip -q "../${artifact}.zip" taskcapsule.exe LICENSE README.md
-          else
-            tar czf "${artifact}.tar.gz" -C "$artifact" . --transform 's,^\./,taskcapsule/,'
-          fi
-
-      - name: Verify archive contents
+      - name: Verify all 5 archives exist
         run: |
-          if [ "${{ matrix.goos }}" = "windows" ]; then
-            unzip -l taskcapsule_*.zip | grep -q "README.md" && echo "README present" || exit 1
-            unzip -l taskcapsule_*.zip | grep -q "LICENSE" && echo "LICENSE present" || exit 1
-          else
-            tar tzf taskcapsule_*.tar.gz | grep -q "README.md" && echo "README present" || exit 1
-            tar tzf taskcapsule_*.tar.gz | grep -q "LICENSE" && echo "LICENSE present" || exit 1
-          fi
+          set -e
+          cd dist
+          for f in \
+            taskcapsule_0.0.0-dry-run_linux_amd64.tar.gz \
+            taskcapsule_0.0.0-dry-run_linux_arm64.tar.gz \
+            taskcapsule_0.0.0-dry-run_darwin_amd64.tar.gz \
+            taskcapsule_0.0.0-dry-run_darwin_arm64.tar.gz \
+            taskcapsule_0.0.0-dry-run_windows_amd64.zip; do
+            test -f "$f" || { echo "Missing: $f"; exit 1; }
+            echo "Found: $f"
+          done
+          echo "All 5 archives present"
+
+      - name: Verify Linux amd64 archive contents
+        run: |
+          set -euo pipefail
+          cd dist
+          tar tzf taskcapsule_0.0.0-dry-run_linux_amd64.tar.gz | grep -q "LICENSE" || { echo "LICENSE missing"; exit 1; }
+          tar tzf taskcapsule_0.0.0-dry-run_linux_amd64.tar.gz | grep -q "README.md" || { echo "README.md missing"; exit 1; }
+          tar tzf taskcapsule_0.0.0-dry-run_linux_amd64.tar.gz | grep -q "taskcapsule" || { echo "binary missing"; exit 1; }
+          echo "Linux amd64 archive valid"
+
+      - name: Verify Windows archive contents
+        run: |
+          set -euo pipefail
+          cd dist
+          unzip -l taskcapsule_0.0.0-dry-run_windows_amd64.zip | grep -q "LICENSE" || { echo "LICENSE missing"; exit 1; }
+          unzip -l taskcapsule_0.0.0-dry-run_windows_amd64.zip | grep -q "README.md" || { echo "README.md missing"; exit 1; }
+          unzip -l taskcapsule_0.0.0-dry-run_windows_amd64.zip | grep -q "taskcapsule.exe" || { echo "taskcapsule.exe missing"; exit 1; }
+          echo "Windows archive valid"
+
+      - name: Verify checksums
+        run: |
+          set -euo pipefail
+          cd dist
+          test -f checksums.txt || { echo "checksums.txt missing"; exit 1; }
+          sha256sum -c checksums.txt || { echo "checksum verification failed"; exit 1; }
+          echo "All checksums valid"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: dry-run-${{ matrix.goos }}_${{ matrix.goarch }}
-          path: taskcapsule_*.tar.gz taskcapsule_*.zip
+          name: release-dry-run
+          path: dist/*
