@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -12,6 +11,18 @@ func init() {
 	register(command{name: "completion", desc: "Generate shell completion scripts", handler: handleCompletion})
 }
 
+func commandNames() []string {
+	var names []string
+	for _, c := range commands {
+		if c.name == "completion" {
+			continue
+		}
+		names = append(names, c.name)
+	}
+	sort.Strings(names)
+	return names
+}
+
 func handleCompletion(args []string) int {
 	if len(args) == 0 {
 		fmt.Fprintln(os.Stderr, "Usage: taskcapsule completion <shell>")
@@ -20,75 +31,69 @@ func handleCompletion(args []string) int {
 	}
 
 	shell := args[0]
+	cmds := commandNames()
+
 	switch shell {
 	case "bash":
-		completionBash()
+		completionBash(cmds)
 		return 0
 	case "zsh":
-		completionZsh()
+		completionZsh(cmds)
 		return 0
 	case "fish":
-		completionFish()
+		completionFish(cmds)
 		return 0
 	case "powershell":
-		completionPowerShell()
+		completionPowerShell(cmds)
 		return 0
 	default:
-		fmt.Fprintf(os.Stderr, "Unknown shell: %s\nSupported: bash, zsh, fish, powershell\n", shell)
+		fmt.Fprintf(os.Stderr, "Error: unknown shell %q\nSupported: bash, zsh, fish, powershell\n", shell)
 		return 2
 	}
 }
 
-func commandNames() []string {
-	var names []string
-	for _, c := range commands {
-		names = append(names, c.name)
-	}
-	sort.Strings(names)
-	return names
-}
-
-func completionBash() {
-	cmds := strings.Join(commandNames(), " ")
-	fmt.Println(`_taskcapsule() {
+func completionBash(cmds []string) {
+	opts := strings.Join(append(cmds, "--help", "--version"), " ")
+	fmt.Printf(`_taskcapsule() {
   local cur prev opts
   COMPREPLY=()
   cur="${COMP_WORDS[COMP_CWORD]}"
-  opts="` + cmds + ` --help --version"
+  opts="%s"
   COMPREPLY=($(compgen -W "${opts}" -- ${cur}))
   return 0
 }
-complete -F _taskcapsule taskcapsule`)
+complete -F _taskcapsule taskcapsule
+`, opts)
 }
 
-func completionZsh() {
-	cmds := strings.Join(commandNames(), " ")
-	fmt.Println(`#compdef taskcapsule
+func completionZsh(cmds []string) {
+	opts := strings.Join(cmds, " ")
+	fmt.Printf(`#compdef taskcapsule
 _taskcapsule() {
   local -a opts
-  opts=(` + cmds + `)
+  opts=(%s)
   _describe 'taskcapsule' opts
 }
-_taskcapsule "$@"`)
+_taskcapsule "$@"
+`, opts)
 }
 
-func completionFish() {
-	cmds := strings.Join(commandNames(), " ")
-	fmt.Println(`complete -c taskcapsule -f -a "` + cmds + `"`)
+func completionFish(cmds []string) {
+	for _, cmd := range cmds {
+		fmt.Printf("complete -c taskcapsule -f -a \"%s\"\n", cmd)
+	}
 }
 
-func completionPowerShell() {
-	fmt.Println(`@("completion", "check", "delete", "doctor", "handoff", "init", "list", "logs", "note", "pause", "resume", "start", "status", "version", "where") | ForEach-Object {
-  Register-ArgumentCompleter -Native -CommandName taskcapsule -ScriptBlock {
-    param($wordToComplete, $commandAst, $cursorPosition)
-    $commands = @("completion", "check", "delete", "doctor", "handoff", "init", "list", "logs", "note", "pause", "resume", "start", "status", "version", "where")
-    $commands | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object { $_ }
-  }
-}`)
+func completionPowerShell(cmds []string) {
+	opts := strings.Join(cmds, `", "`)
+	fmt.Printf(`Register-ArgumentCompleter -Native -CommandName taskcapsule -ScriptBlock {
+  param($wordToComplete, $commandAst, $cursorPosition)
+  $commands = @("%s")
+  $commands | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object { $_ }
+}
+`, opts)
 }
 
-func CompletionUsage() string {
-	return "Usage: taskcapsule completion <bash|zsh|fish|powershell>\n\nGenerate shell completion scripts.\n\nExample:\n  taskcapsule completion bash > /etc/bash_completion.d/taskcapsule"
+func completionHelp() string {
+	return "Usage: taskcapsule completion <bash|zsh|fish|powershell>\n\nGenerate shell completion scripts.\n\nExamples:\n  taskcapsule completion bash > ~/.local/share/bash-completion/completions/taskcapsule\n  taskcapsule completion zsh > ~/.zsh/completion/_taskcapsule\n  taskcapsule completion fish > ~/.config/fish/completions/taskcapsule.fish\n  taskcapsule completion powershell >> $PROFILE"
 }
-
-var ErrCompletionUsage = errors.New(CompletionUsage())

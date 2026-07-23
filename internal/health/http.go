@@ -1,6 +1,9 @@
 package health
 
-import "net/http"
+import (
+	"fmt"
+	"net/http"
+)
 
 // HTTPChecker performs HTTP health checks with retries.
 type HTTPChecker struct {
@@ -31,5 +34,5 @@ type StatusError struct {
 }
 
 func (e *StatusError) Error() string {
-	return "expected status " + string(rune(e.Expected)) + ", got " + string(rune(e.Got))
+	return fmt.Sprintf("expected status %d, got %d", e.Expected, e.Got)
 }
