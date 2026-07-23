@@ -2,13 +2,30 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in TaskCapsule, please report it privately via GitHub Security Advisory or email.
+To report a security vulnerability in TaskCapsule, please open a private security advisory on GitHub:
 
-Please do **not** disclose the issue publicly until it has been addressed.
+https://github.com/vtino17/taskcapsule/security/advisories/new
+
+Do not open a public issue for security vulnerabilities.
+
+## What to Include
+
+- Description of the vulnerability
+- Steps to reproduce
+- Potential impact
+- Suggested fix (if known)
 
 ## Supported Versions
 
-| Version | Supported          |
-|---------|--------------------|
-| latest  | :white_check_mark: |
-| older   | :x:                |
+| Version | Supported |
+|---------|-----------|
+| latest  | Yes |
+| older   | No |
+
+## Known Security Properties
+
+- TaskCapsule never persists environment variable values
+- Handoff reports redact likely secrets (API keys, tokens, passwords)
+- State files use restrictive permissions (0600)
+- No network services listen by default
+- No external API calls occur
