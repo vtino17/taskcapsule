@@ -6,8 +6,8 @@ VERSION="${VERSION:-0.0.0-dev}"
 COMMIT="${COMMIT:-unknown}"
 BUILD_DATE="${BUILD_DATE:-$(date -u +%Y-%m-%d)}"
 
-if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
-    echo "Error: version must be in semver format (e.g. 1.0.0), got: $VERSION" >&2
+if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-_].+)?$ ]]; then
+    echo "Error: version must be in semver format (e.g. 1.0.0 or 1.0.0-dry-run), got: $VERSION" >&2
     exit 1
 fi
 
@@ -38,7 +38,11 @@ build_target() {
     fi
 
     rm -rf "$OUTPUT_DIR/$artifact"
-    echo "  -> $OUTPUT_DIR/${artifact}.tar.gz"
+    if [ "$goos" = "windows" ]; then
+        echo "  -> $OUTPUT_DIR/${artifact}.zip"
+    else
+        echo "  -> $OUTPUT_DIR/${artifact}.tar.gz"
+    fi
 }
 
 build_target linux   amd64   ""

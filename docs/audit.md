@@ -8,12 +8,20 @@
 
 Every workflow job uses `go-version-file: go.mod` (resolves to `go 1.24`).
 
-| Workflow | Go Resolution | Validation |
-|----------|-------------|------------|
-| `ci.yml` | `go-version-file: go.mod` | NOT VERIFIED (no Actions run yet) |
-| `release.yml` | `go-version-file: go.mod` | NOT VERIFIED (no Actions run yet) |
+## CI Validation
 
-Previous version (Go 1.21) and earlier Go 1.25 have been removed from all workflow files.
+Final PR commit: `f3b0f7d89edc6604c0ba8a77902b9cfde191c807`
+Workflow run: [30006669553](https://github.com/vtino17/taskcapsule/actions/runs/30006669553)
+
+| Job | Conclusion |
+|-----|-----------|
+| lint | CI VERIFIED / SUCCESS |
+| test | CI VERIFIED / SUCCESS |
+| race | CI VERIFIED / SUCCESS |
+| build | CI VERIFIED / SUCCESS |
+| integration | CI VERIFIED / SUCCESS |
+| integration-race | CI VERIFIED / SUCCESS |
+| release-dry-run | CI VERIFIED / SUCCESS |
 
 ## Local Validation
 
@@ -22,89 +30,63 @@ Previous version (Go 1.21) and earlier Go 1.25 have been removed from all workfl
 | `go build ./...` | VERIFIED |
 | `go test ./...` | VERIFIED |
 | `go vet ./...` | VERIFIED |
-| `go fmt ./...` | VERIFIED |
+| `gofmt -l .` | VERIFIED |
 | `go mod verify` | VERIFIED |
-| `go test -race ./...` | BLOCKED (requires CGO) |
+| Race tests (local) | BLOCKED (CGO unavailable) |
 
-## CI Validation
+## Package Test Coverage
 
-| Job | Status | Evidence |
-|-----|--------|----------|
-| lint | NOT VERIFIED | No Actions run on final commit |
-| test | NOT VERIFIED | No Actions run on final commit |
-| race | NOT VERIFIED | No Actions run on final commit |
-| build | NOT VERIFIED | No Actions run on final commit |
-| integration | NOT VERIFIED | No Actions run on final commit |
-| integration-race | NOT VERIFIED | No Actions run on final commit |
-| release-dry-run | NOT VERIFIED | Not yet executed |
+All 13 packages have tests:
+
+| Package | Tests | Status |
+|---------|-------|--------|
+| `app` | Yes (exit codes, state dir, log reader) | VERIFIED |
+| `capsule` | Yes (model, validation, state machine) | VERIFIED |
+| `checks` | Yes (success, failure, missing exec) | VERIFIED |
+| `cli` | Yes (completion, command dispatch) | VERIFIED |
+| `config` | Yes (load, template, validate) | VERIFIED |
+| `git` | Yes (branch, repo ID, worktree) | LOCALLY VERIFIED |
+| `health` | Yes (HTTP, TCP, timeout, StatusError) | VERIFIED |
+| `lock` | Yes (file lock, isAlive) | VERIFIED |
+| `ports` | Yes (allocator) | VERIFIED |
+| `process` | Yes (start, stop, group, helper pattern) | VERIFIED |
+| `report` | Yes (handoff, redact) | VERIFIED |
+| `state` | Yes (store, atomic writes) | VERIFIED |
+| `version` | Yes (build info) | VERIFIED |
+
+Note: The duplicate `internal/doctor` package was removed. It was dead code (no references to it existed anywhere in the codebase). All doctor functionality is provided by `internal/app.Doctor()`.
 
 ## Shell Completion
 
 | Shell | Generation | Syntax Check | Status |
 |-------|-----------|-------------|--------|
 | bash | VERIFIED | NOT VERIFIED (bash -n unavailable) | LOCALLY VERIFIED |
-| zsh | VERIFIED | NOT VERIFIED (zsh not available) | LOCALLY VERIFIED |
-| fish | VERIFIED | NOT VERIFIED (fish not available) | LOCALLY VERIFIED |
-| powershell | VERIFIED | VERIFIED (single Register-ArgumentCompleter) | VERIFIED |
+| zsh | VERIFIED | NOT VERIFIED | LOCALLY VERIFIED |
+| fish | VERIFIED | NOT VERIFIED | LOCALLY VERIFIED |
+| powershell | VERIFIED | CI VERIFIED | VERIFIED |
 
-Implementation: `internal/cli/completion.go` generates dynamic command lists from the command registry.
-All registered commands (including `completion`) are included. Extra arguments are rejected with exit code 2.
+## Log Safety
 
-## Commands
-
-All 16 commands verified against implementation.
-
-## Package Test Coverage
-
-| Package | Tests | Status |
-|---------|-------|--------|
-| `capsule` | Yes | VERIFIED |
-| `cli` | Yes | VERIFIED (completion tests added) |
-| `config` | Yes | VERIFIED |
-| `git` | Yes | LOCALLY VERIFIED |
-| `health` | Yes | VERIFIED (HTTP, TCP, timeout tests) |
-| `lock` | Yes | VERIFIED |
-| `ports` | Yes | VERIFIED |
-| `report` | Yes | VERIFIED |
-| `state` | Yes | VERIFIED |
-| `version` | Yes | VERIFIED |
-| `app` | Yes | VERIFIED (exit codes, state dir, process checks) |
-| `checks` | Yes | VERIFIED (success, failure, missing exec, logging) |
-| `process` | Yes | VERIFIED (start, stop, group, alive) |
-| `doctor` | No | NOT IMPLEMENTED |
-
-14 of 14 packages now have test coverage.
-
-All 14 existing packages have tests. `app`, `checks`, `cli`, `health`, and `process` now include test files.
+- Default: 200 lines / 256 KiB tail
+- Configurable via `--lines N` flag
+- Large files: tail from byte limit + truncation notice
 
 ## Platform Support
 
 | Feature | Linux | macOS | Windows |
 |---------|-------|-------|---------|
-| Git worktree | VERIFIED | LOCALLY VERIFIED | LOCALLY VERIFIED |
-| Process groups | VERIFIED | LOCALLY VERIFIED | EXPERIMENTAL |
-| PID management | VERIFIED | LOCALLY VERIFIED | PARTIAL |
-| Port allocation | VERIFIED | LOCALLY VERIFIED | LOCALLY VERIFIED |
-| Health checks | VERIFIED | LOCALLY VERIFIED | LOCALLY VERIFIED |
-| Secret redaction | VERIFIED | LOCALLY VERIFIED | LOCALLY VERIFIED |
-| Doctor diagnostics | LOCALLY VERIFIED | LOCALLY VERIFIED | NOT VERIFIED |
+| Git worktree | CI VERIFIED | CI VERIFIED | NOT VERIFIED |
+| Process groups | CI VERIFIED | CI VERIFIED | EXPERIMENTAL |
+| PID management | CI VERIFIED | CI VERIFIED | PARTIAL |
+| Port allocation | CI VERIFIED | CI VERIFIED | CI VERIFIED |
+| Health checks | CI VERIFIED | CI VERIFIED | CI VERIFIED |
+| Secret redaction | CI VERIFIED | CI VERIFIED | CI VERIFIED |
 
-## Log Safety
+## Tag-Triggered Release Publication
 
-Log reading uses bounded tail:
-
-- Default: 200 lines or 256 KiB, whichever limit is hit first
-- Configurable via `--lines N` flag
-- Bounded byte reader implemented in `internal/app/logreader.go`
-- Files smaller than both limits are returned in full
-- Truncated output prepends a notification line
-- Secret redaction is applied to handoff log excerpts
+NOT VERIFIED. No release tag has been created.
 
 ## Known Limitations
 
-- Docker Compose integration: NOT IMPLEMENTED
-- Race tests require CGO (BLOCKED in this environment)
-- CI has no successful Actions run on the final branch commit
 - Windows process management is EXPERIMENTAL
-- Some doctor diagnostics are not implemented
-- No release tag has been created
+- Docker Compose integration: NOT IMPLEMENTED
