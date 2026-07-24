@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.2] - 2026-07-24
+
+### Fixed
+- Scoped `doctor` branch checks to capsules belonging to the current repository
+- Prevented false "branch no longer exists" warnings for capsules from other repositories
+- Normalized repository path separators when computing fallback repository IDs on Windows
+- Added isolated regression tests for cross-repository doctor diagnostics
+
 ## [0.1.1] - 2026-07-23
 
 ### Fixed
