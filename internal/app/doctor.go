@@ -27,6 +27,9 @@ func Doctor() ([]DoctorResult, error) {
 		return results, nil
 	}
 
+	// Resolve current repository ID for scoping capsule branch checks
+	currentRepoID, repoIDErr := git.RepoID(root)
+
 	// Check config
 	cfgPath := filepath.Join(root, ".taskcapsule.json")
 	if _, err := os.Stat(cfgPath); os.IsNotExist(err) {
@@ -67,13 +70,18 @@ func Doctor() ([]DoctorResult, error) {
 				continue
 			}
 
-			// Check branch still exists
-			branchExists, _ := git.BranchExists(caps.Branch, root)
-			if !branchExists {
-				results = append(results, DoctorResult{
-					OK:      false,
-					Message: "Capsule " + caps.Name + " branch '" + caps.Branch + "' no longer exists",
-				})
+			// Check branch still exists — only for capsules belonging to the
+			// current repository. Capsules from other repositories are skipped
+			// to avoid false positives: their branches will not exist in this
+			// repo's ref namespace.
+			if repoIDErr == nil && caps.RepositoryID == currentRepoID {
+				branchExists, _ := git.BranchExists(caps.Branch, root)
+				if !branchExists {
+					results = append(results, DoctorResult{
+						OK:      false,
+						Message: "Capsule " + caps.Name + " branch '" + caps.Branch + "' no longer exists",
+					})
+				}
 			}
 
 			// Check for stale PIDs

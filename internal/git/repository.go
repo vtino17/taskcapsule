@@ -3,6 +3,7 @@ package git
 import (
 	"crypto/sha256"
 	"fmt"
+	"path/filepath"
 	"strings"
 )
 
@@ -11,10 +12,13 @@ func Root() (string, error) {
 }
 
 func RepoID(root string) (string, error) {
-	remote, err := execGitInDir(root, "remote", "get-url", "origin")
+	// Normalize path separators so that C:\foo\bar and C:/foo/bar
+	// produce the same ID on Windows.
+	normalized := filepath.ToSlash(root)
+
+	remote, err := execGitInDir(normalized, "remote", "get-url", "origin")
 	if err != nil {
-		// Fallback: use repo root path hash
-		h := sha256.Sum256([]byte(root))
+		h := sha256.Sum256([]byte(normalized))
 		return fmt.Sprintf("%x", h[:8]), nil
 	}
 
