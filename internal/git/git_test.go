@@ -51,10 +51,32 @@ func TestRoot(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	abs, _ := filepath.Abs(dir)
-	abs = filepath.ToSlash(abs)
-	if root != abs {
-		t.Errorf("expected %s, got %s", abs, root)
+	want, err := canonicalRoot(dir)
+	if err != nil {
+		t.Fatalf("canonicalRoot: %v", err)
+	}
+	if root != want {
+		t.Errorf("expected %s, got %s", want, root)
+	}
+}
+
+func TestRepoIDCanonicalizesSymlinkAliases(t *testing.T) {
+	dir := setupTestRepo(t)
+	alias := filepath.Join(t.TempDir(), "repo-alias")
+	if err := os.Symlink(dir, alias); err != nil {
+		t.Skipf("symlinks are unavailable: %v", err)
+	}
+
+	directID, err := RepoID(dir)
+	if err != nil {
+		t.Fatalf("RepoID(direct): %v", err)
+	}
+	aliasID, err := RepoID(alias)
+	if err != nil {
+		t.Fatalf("RepoID(alias): %v", err)
+	}
+	if directID != aliasID {
+		t.Fatalf("expected canonical aliases to share an ID, got %s and %s", directID, aliasID)
 	}
 }
 

@@ -8,15 +8,25 @@ import (
 )
 
 func Root() (string, error) {
-	return execGit("rev-parse", "--show-toplevel")
+	root, err := execGit("rev-parse", "--show-toplevel")
+	if err != nil {
+		return "", err
+	}
+	return canonicalRoot(root)
 }
 
 func RepoID(root string) (string, error) {
-	// Normalize path separators so that C:\foo\bar and C:/foo/bar
-	// produce the same ID on Windows.
-	normalized := filepath.ToSlash(root)
+	canonical, err := canonicalRoot(root)
+	if err != nil {
+		return "", fmt.Errorf("canonicalize repository root: %w", err)
+	}
 
-	remote, err := execGitInDir(normalized, "remote", "get-url", "origin")
+	// Normalize path separators so that equivalent platform spellings produce
+	// the same fallback ID. Resolving symlinks also handles macOS's /var ->
+	// /private/var alias consistently.
+	normalized := filepath.ToSlash(canonical)
+
+	remote, err := execGitInDir(canonical, "remote", "get-url", "origin")
 	if err != nil {
 		h := sha256.Sum256([]byte(normalized))
 		return fmt.Sprintf("%x", h[:8]), nil
@@ -24,6 +34,18 @@ func RepoID(root string) (string, error) {
 
 	h := sha256.Sum256([]byte(remote))
 	return fmt.Sprintf("%x", h[:8]), nil
+}
+
+func canonicalRoot(root string) (string, error) {
+	abs, err := filepath.Abs(root)
+	if err != nil {
+		return "", err
+	}
+	resolved, err := filepath.EvalSymlinks(abs)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Clean(resolved), nil
 }
 
 func RepoName(root string) (string, error) {
