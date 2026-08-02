@@ -13,6 +13,13 @@ import (
 )
 
 func RunCheck(name string, cmdArgs []string) (*CheckResult, error) {
+	if err := validateCapsuleName(name); err != nil {
+		return nil, err
+	}
+	if len(cmdArgs) == 0 || cmdArgs[0] == "" {
+		return nil, fmt.Errorf("check command must not be empty")
+	}
+
 	root, err := findGitRoot()
 	if err != nil {
 		return nil, err
@@ -29,10 +36,13 @@ func RunCheck(name string, cmdArgs []string) (*CheckResult, error) {
 	}
 	defer cl.Release()
 
-	stateBase, _ := getStateDir()
+	stateBase, err := getStateDir()
+	if err != nil {
+		return nil, err
+	}
 	cs := state.NewStore(stateBase)
 
-	s, err := cs.Load(repoID, name)
+	s, err := loadValidatedCapsule(cs, stateBase, repoID, name)
 	if err != nil {
 		return nil, fmt.Errorf("capsule not found: %s", name)
 	}
@@ -43,7 +53,9 @@ func RunCheck(name string, cmdArgs []string) (*CheckResult, error) {
 	}
 
 	checkDir := filepath.Join(stateBase, "capsules", repoID, name, "checks")
-	os.MkdirAll(checkDir, 0755)
+	if err := state.EnsureDir(checkDir, 0700); err != nil {
+		return nil, fmt.Errorf("cannot create check log directory: %v", err)
+	}
 
 	timestamp := time.Now().UTC().Format("20060102-150405")
 	logFile := filepath.Join(checkDir, timestamp+".log")
@@ -68,7 +80,9 @@ func RunCheck(name string, cmdArgs []string) (*CheckResult, error) {
 
 	logContent := fmt.Sprintf("Command: %s\nStarted: %s\nDuration: %.1fs\nExit code: %d\n\n%s",
 		strings.Join(cmdArgs, " "), start.Format(time.RFC3339), duration, exitCode, outputBuf.String())
-	os.WriteFile(logFile, []byte(logContent), 0644)
+	if err := os.WriteFile(logFile, []byte(logContent), 0600); err != nil {
+		return nil, fmt.Errorf("cannot write check log: %v", err)
+	}
 
 	s.LastCheck = &capsule.CheckState{
 		Command:    cmdArgs,
@@ -78,7 +92,9 @@ func RunCheck(name string, cmdArgs []string) (*CheckResult, error) {
 		LogPath:    logFile,
 	}
 	s.UpdatedAt = time.Now().UTC()
-	cs.Save(repoID, name, s)
+	if err := cs.Save(repoID, name, s); err != nil {
+		return nil, fmt.Errorf("cannot save check result: %v", err)
+	}
 
 	return &CheckResult{
 		Command:  strings.Join(cmdArgs, " "),

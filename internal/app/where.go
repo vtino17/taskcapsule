@@ -9,6 +9,10 @@ import (
 )
 
 func Where(name string) (*WhereInfo, error) {
+	if err := validateCapsuleName(name); err != nil {
+		return nil, err
+	}
+
 	root, err := findGitRoot()
 	if err != nil {
 		return nil, err
@@ -19,10 +23,13 @@ func Where(name string) (*WhereInfo, error) {
 		return nil, err
 	}
 
-	stateBase, _ := getStateDir()
+	stateBase, err := getStateDir()
+	if err != nil {
+		return nil, err
+	}
 	cs := state.NewStore(stateBase)
 
-	s, err := cs.Load(repoID, name)
+	s, err := loadValidatedCapsule(cs, stateBase, repoID, name)
 	if err != nil {
 		return nil, fmt.Errorf("capsule not found: %s", name)
 	}

@@ -5,12 +5,22 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/vtino17/taskcapsule/internal/capsule"
 	"github.com/vtino17/taskcapsule/internal/git"
 )
 
 var defaultLogReader = DefaultLogReader
 
 func ShowLogs(name string, opts LogOptions) ([]byte, error) {
+	if err := validateCapsuleName(name); err != nil {
+		return nil, err
+	}
+	if opts.ServiceName != "" {
+		if err := capsule.ValidateName(opts.ServiceName); err != nil {
+			return nil, fmt.Errorf("invalid service name: %w", err)
+		}
+	}
+
 	root, err := findGitRoot()
 	if err != nil {
 		return nil, err
@@ -21,7 +31,10 @@ func ShowLogs(name string, opts LogOptions) ([]byte, error) {
 		return nil, err
 	}
 
-	stateBase, _ := getStateDir()
+	stateBase, err := getStateDir()
+	if err != nil {
+		return nil, err
+	}
 	logDir := filepath.Join(stateBase, "capsules", repoID, name, "logs")
 
 	if opts.ServiceName != "" {

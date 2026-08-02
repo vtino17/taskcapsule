@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,6 +13,10 @@ import (
 )
 
 func Resume(name string, opts ResumeOptions) (*ResumeResult, error) {
+	if err := validateCapsuleName(name); err != nil {
+		return nil, err
+	}
+
 	root, err := findGitRoot()
 	if err != nil {
 		return nil, err
@@ -27,10 +32,13 @@ func Resume(name string, opts ResumeOptions) (*ResumeResult, error) {
 		return nil, err
 	}
 
-	stateBase, _ := getStateDir()
+	stateBase, err := getStateDir()
+	if err != nil {
+		return nil, err
+	}
 	cs := state.NewStore(stateBase)
 
-	s, err := cs.Load(repoID, name)
+	s, err := loadValidatedCapsule(cs, stateBase, repoID, name)
 	if err != nil {
 		return nil, fmt.Errorf("capsule not found: %s", name)
 	}
@@ -51,7 +59,7 @@ func Resume(name string, opts ResumeOptions) (*ResumeResult, error) {
 	defer cl.Release()
 
 	// Reload state under lock
-	s, err = cs.Load(repoID, name)
+	s, err = loadValidatedCapsule(cs, stateBase, repoID, name)
 	if err != nil {
 		return nil, fmt.Errorf("capsule not found: %s", name)
 	}
@@ -62,14 +70,17 @@ func Resume(name string, opts ResumeOptions) (*ResumeResult, error) {
 
 	s.Status = "resuming"
 	s.UpdatedAt = time.Now().UTC()
-	cs.Save(repoID, name, s)
+	if err := cs.Save(repoID, name, s); err != nil {
+		return nil, fmt.Errorf("failed to persist resuming state: %v", err)
+	}
 
 	if opts.RunSetup {
 		for _, setup := range cfg.Setup {
 			cmd := execInDir(setup.Command, s.WorktreePath)
 			if output, err := cmd.CombinedOutput(); err != nil {
-				setErrorState(s, fmt.Errorf("setup failed on resume: %v\n%s", err, string(output)), cs, repoID, name)
-				return nil, fmt.Errorf("setup failed: %v\n%s", err, string(output))
+				setupErr := fmt.Errorf("setup failed: %v\n%s", err, string(output))
+				persistErr := setErrorState(s, setupErr, cs, repoID, name)
+				return nil, errors.Join(setupErr, persistErr)
 			}
 		}
 	}
@@ -86,14 +97,18 @@ func Resume(name string, opts ResumeOptions) (*ResumeResult, error) {
 	// Sequential startup with rollback
 	started, serviceInfos, startErr := startServices(cfg, stateBase, repoID, name, s.WorktreePath, s, cs)
 	if startErr != nil {
-		rollbackServices(started, s, cs)
-		setErrorState(s, startErr, cs, repoID, name)
-		return nil, startErr
+		rollbackServices(started, s)
+		persistErr := setErrorState(s, startErr, cs, repoID, name)
+		return nil, errors.Join(startErr, persistErr)
 	}
 
 	s.Status = "running"
 	s.UpdatedAt = time.Now().UTC()
-	cs.Save(repoID, name, s)
+	if err := cs.Save(repoID, name, s); err != nil {
+		rollbackServices(started, s)
+		persistErr := setErrorState(s, err, cs, repoID, name)
+		return nil, errors.Join(fmt.Errorf("services started but running state could not be persisted: %w", err), persistErr)
+	}
 
 	return &ResumeResult{
 		Services: serviceInfos,

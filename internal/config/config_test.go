@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -113,6 +114,35 @@ func TestLoadEmptyCommand(t *testing.T) {
 	}
 }
 
+func TestLoadRejectsUnsafeMapKeys(t *testing.T) {
+	tests := []string{
+		`{"version":1,"services":{"../../escape":{"command":["go","run","."]}}}`,
+		`{"version":1,"checks":{"../escape":{"command":["go","test","./..."]}}}`,
+	}
+
+	for _, content := range tests {
+		f, err := os.CreateTemp("", "taskcapsule-*.json")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.Write([]byte(content)); err != nil {
+			f.Close()
+			os.Remove(f.Name())
+			t.Fatal(err)
+		}
+		if err := f.Close(); err != nil {
+			os.Remove(f.Name())
+			t.Fatal(err)
+		}
+
+		_, loadErr := Load(f.Name())
+		os.Remove(f.Name())
+		if loadErr == nil {
+			t.Fatalf("Load accepted unsafe config: %s", content)
+		}
+	}
+}
+
 func TestApplyDefaults(t *testing.T) {
 	cfg := &Config{
 		Version: 1,
@@ -148,5 +178,18 @@ func TestValidateCommand(t *testing.T) {
 		if (err != nil) != tt.wantErr {
 			t.Errorf("validateCommand(%v) error = %v, wantErr = %v", tt.cmd, err, tt.wantErr)
 		}
+	}
+}
+
+func TestValidateWorkDirRejectsSymlinkEscape(t *testing.T) {
+	root := t.TempDir()
+	outside := t.TempDir()
+	link := filepath.Join(root, "escape")
+	if err := os.Symlink(outside, link); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+
+	if err := ValidateWorkDir(link, root); err == nil {
+		t.Fatal("working-directory symlink escape was accepted")
 	}
 }

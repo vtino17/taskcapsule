@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/vtino17/taskcapsule/internal/lock"
-	"github.com/vtino17/taskcapsule/internal/state"
 )
 
 type capsuleLock struct {
@@ -33,22 +32,4 @@ func (cl *capsuleLock) Release() {
 		return
 	}
 	cl.lock.Release()
-}
-
-func lockAndLoad(repoID, capsuleName, command string) (*capsuleLock, *state.Store, error) {
-	cl, err := acquireCapsuleLock(repoID, capsuleName, command)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	stateBase, _ := getStateDir()
-	cs := state.NewStore(stateBase)
-	s, err := cs.Load(repoID, capsuleName)
-	if err != nil {
-		cl.Release()
-		return nil, nil, err
-	}
-	_ = s // Caller uses returned store
-
-	return cl, cs, nil
 }

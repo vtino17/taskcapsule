@@ -81,6 +81,13 @@ func TestGetStateDirEnv(t *testing.T) {
 	}
 }
 
+func TestGetStateDirRejectsFilesystemRoot(t *testing.T) {
+	t.Setenv("TASKCAPSULE_HOME", string(os.PathSeparator))
+	if _, err := getStateDir(); err == nil {
+		t.Fatal("filesystem root was accepted as TASKCAPSULE_HOME")
+	}
+}
+
 func TestIsProcessRunning(t *testing.T) {
 	if !isProcessRunning(os.Getpid()) {
 		// On Windows, FindProcess always succeeds but Signal may fail for the current process

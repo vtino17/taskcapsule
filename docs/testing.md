@@ -33,4 +33,7 @@ Integration tests use temporary directories and Git repositories to verify the f
 go test ./... -count=1
 go test -race ./...
 go vet ./...
+bash scripts/verify-reproducible-release.sh ./dist
 ```
+
+GitHub CI additionally runs integration tests under the race detector, macOS and Windows smoke jobs, CodeQL, `govulncheck`, OpenSSF Scorecard, CycloneDX SBOM generation, and provenance attestation for published releases.

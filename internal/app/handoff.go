@@ -12,6 +12,10 @@ import (
 )
 
 func GenerateHandoff(name string) (string, error) {
+	if err := validateCapsuleName(name); err != nil {
+		return "", err
+	}
+
 	root, err := findGitRoot()
 	if err != nil {
 		return "", err
@@ -28,10 +32,13 @@ func GenerateHandoff(name string) (string, error) {
 	}
 	defer cl.Release()
 
-	stateBase, _ := getStateDir()
+	stateBase, err := getStateDir()
+	if err != nil {
+		return "", err
+	}
 	cs := state.NewStore(stateBase)
 
-	s, err := cs.Load(repoID, name)
+	s, err := loadValidatedCapsule(cs, stateBase, repoID, name)
 	if err != nil {
 		return "", fmt.Errorf("capsule not found: %s", name)
 	}
@@ -75,17 +82,23 @@ func GenerateHandoff(name string) (string, error) {
 	})
 
 	handoffDir := filepath.Join(filepath.Dir(s.WorktreePath), "handoffs")
-	os.MkdirAll(handoffDir, 0755)
+	if err := state.EnsureDir(handoffDir, 0700); err != nil {
+		return "", fmt.Errorf("cannot create handoff directory: %v", err)
+	}
 	destPath := filepath.Join(handoffDir, name+".md")
 
 	projectHandoffDir := filepath.Join(root, ".taskcapsule", "handoff")
-	os.MkdirAll(projectHandoffDir, 0755)
+	if err := state.EnsureDir(projectHandoffDir, 0700); err != nil {
+		return "", fmt.Errorf("cannot create project handoff directory: %v", err)
+	}
 	projectPath := filepath.Join(projectHandoffDir, name+".md")
 
-	if err := os.WriteFile(destPath, []byte(handoffMD), 0644); err != nil {
+	if err := os.WriteFile(destPath, []byte(handoffMD), 0600); err != nil {
 		return "", fmt.Errorf("cannot write handoff: %v", err)
 	}
-	os.WriteFile(projectPath, []byte(handoffMD), 0644)
+	if err := os.WriteFile(projectPath, []byte(handoffMD), 0600); err != nil {
+		return "", fmt.Errorf("cannot write project handoff: %v", err)
+	}
 
 	return destPath, nil
 }

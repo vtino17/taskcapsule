@@ -10,6 +10,10 @@ import (
 )
 
 func SaveNote(name, text string) error {
+	if err := validateCapsuleName(name); err != nil {
+		return err
+	}
+
 	root, err := findGitRoot()
 	if err != nil {
 		return err
@@ -26,10 +30,13 @@ func SaveNote(name, text string) error {
 	}
 	defer cl.Release()
 
-	stateBase, _ := getStateDir()
+	stateBase, err := getStateDir()
+	if err != nil {
+		return err
+	}
 	cs := state.NewStore(stateBase)
 
-	s, err := cs.Load(repoID, name)
+	s, err := loadValidatedCapsule(cs, stateBase, repoID, name)
 	if err != nil {
 		return fmt.Errorf("capsule not found: %s", name)
 	}

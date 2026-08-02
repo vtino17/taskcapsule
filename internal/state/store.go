@@ -5,10 +5,23 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 
 	"github.com/vtino17/taskcapsule/internal/capsule"
 )
+
+var repoIDPattern = regexp.MustCompile(`^[a-f0-9]{16}$`)
+
+func validateKey(repoID, name string) error {
+	if !repoIDPattern.MatchString(repoID) {
+		return fmt.Errorf("invalid repository ID")
+	}
+	if err := capsule.ValidateName(name); err != nil {
+		return fmt.Errorf("invalid capsule name: %w", err)
+	}
+	return nil
+}
 
 type Store struct {
 	basePath string
@@ -31,31 +44,34 @@ func (s *Store) listCapsulesDir(repoID string) string {
 }
 
 func (s *Store) Save(repoID, name string, state *capsule.State) error {
+	if err := validateKey(repoID, name); err != nil {
+		return err
+	}
+	if state == nil {
+		return fmt.Errorf("capsule state must not be nil")
+	}
 	dir := s.capsuleDir(repoID, name)
-	if err := os.MkdirAll(dir, 0700); err != nil {
+	if err := EnsureDir(dir, 0700); err != nil {
 		return fmt.Errorf("cannot create state directory: %v", err)
 	}
 
 	statePath := s.stateFilePath(repoID, name)
-	tmpPath := statePath + ".tmp"
-
 	data, err := json.MarshalIndent(state, "", "  ")
 	if err != nil {
 		return fmt.Errorf("cannot marshal state: %v", err)
 	}
 
-	if err := os.WriteFile(tmpPath, data, 0600); err != nil {
+	if err := AtomicWrite(statePath, data, 0600); err != nil {
 		return fmt.Errorf("cannot write state: %v", err)
-	}
-
-	if err := os.Rename(tmpPath, statePath); err != nil {
-		return fmt.Errorf("cannot finalize state: %v", err)
 	}
 
 	return nil
 }
 
 func (s *Store) Load(repoID, name string) (*capsule.State, error) {
+	if err := validateKey(repoID, name); err != nil {
+		return nil, err
+	}
 	path := s.stateFilePath(repoID, name)
 
 	data, err := os.ReadFile(path)
@@ -75,11 +91,17 @@ func (s *Store) Load(repoID, name string) (*capsule.State, error) {
 }
 
 func (s *Store) Delete(repoID, name string) error {
+	if err := validateKey(repoID, name); err != nil {
+		return err
+	}
 	dir := s.capsuleDir(repoID, name)
 	return os.RemoveAll(dir)
 }
 
 func (s *Store) List(repoID string) ([]*capsule.State, error) {
+	if !repoIDPattern.MatchString(repoID) {
+		return nil, fmt.Errorf("invalid repository ID")
+	}
 	capsulesDir := s.listCapsulesDir(repoID)
 	return s.readCapsuleDir(capsulesDir)
 }

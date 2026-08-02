@@ -11,6 +11,10 @@ import (
 )
 
 func DeleteCapsule(name string, force bool) error {
+	if err := validateCapsuleName(name); err != nil {
+		return err
+	}
+
 	root, err := findGitRoot()
 	if err != nil {
 		return err
@@ -27,10 +31,13 @@ func DeleteCapsule(name string, force bool) error {
 	}
 	defer cl.Release()
 
-	stateBase, _ := getStateDir()
+	stateBase, err := getStateDir()
+	if err != nil {
+		return err
+	}
 	cs := state.NewStore(stateBase)
 
-	s, err := cs.Load(repoID, name)
+	s, err := loadValidatedCapsule(cs, stateBase, repoID, name)
 	if err != nil {
 		return fmt.Errorf("capsule not found: %s", name)
 	}
@@ -48,7 +55,9 @@ func DeleteCapsule(name string, force bool) error {
 
 	s.Status = "deleting"
 	s.UpdatedAt = time.Now().UTC()
-	cs.Save(repoID, name, s)
+	if err := cs.Save(repoID, name, s); err != nil {
+		return fmt.Errorf("failed to persist deleting state: %v", err)
+	}
 
 	if s.StatusPrevious() == "running" || force {
 		for _, svcState := range s.Services {
@@ -64,12 +73,14 @@ func DeleteCapsule(name string, force bool) error {
 		return fmt.Errorf("failed to remove worktree: %v", err)
 	}
 
-	if err := cs.Delete(repoID, name); err != nil && !force {
-		return fmt.Errorf("failed to remove state: %v", err)
+	// Clean up any leftover worktree directory
+	if err := os.RemoveAll(s.WorktreePath); err != nil {
+		return fmt.Errorf("failed to clean up worktree: %v", err)
 	}
 
-	// Clean up any leftover worktree directory
-	os.RemoveAll(s.WorktreePath)
+	if err := cs.Delete(repoID, name); err != nil {
+		return fmt.Errorf("failed to remove state: %v", err)
+	}
 
 	return nil
 }
