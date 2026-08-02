@@ -45,7 +45,7 @@ func canonicalRoot(root string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Clean(resolved), nil
+	return filepath.ToSlash(filepath.Clean(resolved)), nil
 }
 
 func RepoName(root string) (string, error) {

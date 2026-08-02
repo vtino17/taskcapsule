@@ -35,7 +35,7 @@ taskcapsule resume my-feature
 taskcapsule handoff my-feature
 ```
 
-Each capsule receives a managed worktree below `~/.taskcapsule/worktrees`. State, checks, and service logs are stored below `~/.taskcapsule` with restrictive permissions.
+Each capsule receives a managed worktree below `~/.taskcapsule/worktrees`. State, checks, and service logs are stored below `~/.taskcapsule`; Unix builds apply restrictive modes, while Windows storage inherits the current account's ACLs.
 
 ## Configuration
 
@@ -105,7 +105,7 @@ Run `taskcapsule --help` for command syntax.
 - Loaded state must match the active repository and capsule before it is used.
 - Service working-directory symlinks cannot escape the managed worktree.
 - Child services receive a small baseline environment plus explicitly configured or inherited variables, rather than every parent secret.
-- State, logs, check output, and handoff files use owner-only permissions.
+- On Unix, state directories use mode `0700` and state, logs, check output, and handoff files use mode `0600`. Windows storage inherits the current account's ACLs; Windows support remains experimental.
 - Operations use per-capsule exclusive locks and atomic state replacement.
 - HTTP health checks use bounded timeouts. A configured HTTP health URL can make an outbound request, so configuration must be trusted.
 

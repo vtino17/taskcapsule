@@ -40,7 +40,7 @@ The authoritative race result is therefore the protected GitHub CI job, which ru
 - service working-directory symlinks cannot escape a worktree;
 - unlisted parent environment values are not passed to child services;
 - state replacement uses a unique same-directory temporary file, synchronization, and rename;
-- state, service logs, check logs, and handoff files are owner-only;
+- on Unix, state directories are mode `0700` and state, service logs, check logs, and handoff files are mode `0600`; Windows storage inherits the current account's ACLs;
 - action dependencies are pinned to immutable commits;
 - published archives are compared byte-for-byte across two builds before release.
 

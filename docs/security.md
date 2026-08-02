@@ -12,7 +12,8 @@ TaskCapsule is a local orchestration tool. The operating-system account, Git exe
 - A loaded worktree path must remain below the configured TaskCapsule worktree root before it can be used or recursively removed.
 - Service working directories are checked after symlink resolution and cannot escape the worktree.
 - State is replaced through a same-directory temporary file, `fsync`, and rename.
-- State directories use mode `0700`; state, service logs, check logs, and handoff files use mode `0600`.
+- On Unix, state directories use mode `0700`; state, service logs, check logs, and handoff files use mode `0600`.
+- Windows does not enforce Unix mode bits. TaskCapsule storage inherits the current account's Windows ACLs, and Windows support remains experimental.
 
 ## Command and environment handling
 

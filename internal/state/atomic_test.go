@@ -3,6 +3,7 @@ package state
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -27,7 +28,7 @@ func TestAtomicWriteReplacesContentAndAppliesMode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.Mode().Perm() != 0600 {
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0600 {
 		t.Fatalf("expected mode 0600, got %o", info.Mode().Perm())
 	}
 }
@@ -44,7 +45,7 @@ func TestEnsureDirTightensExistingPermissions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.Mode().Perm() != 0700 {
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0700 {
 		t.Fatalf("expected mode 0700, got %o", info.Mode().Perm())
 	}
 }

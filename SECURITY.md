@@ -29,7 +29,7 @@ Only the newest published release receives security fixes. The default branch an
 - Values named in `inheritEnvironment` are read at process start and are not persisted to capsule state
 - Static values placed directly in `.taskcapsule.json` are part of the repository configuration and must not contain secrets
 - Handoff reports redact likely secrets (API keys, tokens, passwords)
-- State, log, check, and handoff files use restrictive permissions
+- On Unix, state directories use mode `0700` and state, log, check, and handoff files use mode `0600`; Windows storage inherits the current account's ACLs
 - Capsule identifiers and loaded state are validated before filesystem operations
 - Recursive worktree cleanup is restricted to the managed TaskCapsule worktree root
 - No network services listen by default
