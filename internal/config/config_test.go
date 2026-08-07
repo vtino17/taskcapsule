@@ -63,6 +63,24 @@ func TestLoadUnknownSchemaVersion(t *testing.T) {
 	}
 }
 
+func TestLoadRejectsUnknownFields(t *testing.T) {
+	content := `{"version":1,"default":{"baseBranch":"main"}}`
+	f, err := os.CreateTemp("", "taskcapsule-*.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(f.Name())
+	if _, err := f.Write([]byte(content)); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(f.Name()); err == nil {
+		t.Fatal("expected unknown configuration field to be rejected")
+	}
+}
+
 func TestLoadDuplicateService(t *testing.T) {
 	content := `{
 		"version": 1,
