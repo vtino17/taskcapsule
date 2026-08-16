@@ -43,17 +43,21 @@ func Doctor() ([]DoctorResult, error) {
 	if err != nil {
 		results = append(results, DoctorResult{OK: false, Message: "Cannot determine state directory"})
 	} else {
-		if err := os.MkdirAll(filepath.Join(stateBase, "capsules"), 0755); err != nil {
+		if err := state.EnsureDir(filepath.Join(stateBase, "capsules"), 0700); err != nil {
 			results = append(results, DoctorResult{OK: false, Message: "State directory not writable"})
 		} else {
 			results = append(results, DoctorResult{OK: true, Message: "State directory writable"})
 		}
 
-		if err := os.MkdirAll(filepath.Join(stateBase, "worktrees"), 0755); err != nil {
+		if err := state.EnsureDir(filepath.Join(stateBase, "worktrees"), 0700); err != nil {
 			results = append(results, DoctorResult{OK: false, Message: "Worktree directory not writable"})
 		} else {
 			results = append(results, DoctorResult{OK: true, Message: "Worktree directory writable"})
 		}
+	}
+
+	if stateBase == "" {
+		return results, nil
 	}
 
 	// Check all capsules

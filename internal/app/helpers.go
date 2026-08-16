@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -12,6 +14,8 @@ import (
 	"github.com/vtino17/taskcapsule/internal/ports"
 	"github.com/vtino17/taskcapsule/internal/state"
 )
+
+var portPlaceholderPattern = regexp.MustCompile(`\$\{PORT:([A-Za-z_][A-Za-z0-9_]*)\}`)
 
 func execInDir(command []string, dir string) *exec.Cmd {
 	cmd := exec.Command(command[0], command[1:]...)
@@ -23,53 +27,65 @@ type serviceEnv struct {
 	Ports map[string]int
 }
 
-func buildServiceEnv(svcCfg config.ServiceConfig, allocator *ports.Allocator) *serviceEnv {
+func buildServiceEnv(svcCfg config.ServiceConfig, allocator *ports.Allocator) (*serviceEnv, error) {
 	env := &serviceEnv{Ports: make(map[string]int)}
 
-	// Allocate ports for this service - scan all env vars for ${PORT:name}
-	for key, val := range svcCfg.Environment {
-		_ = key
-		if strings.HasPrefix(val, "${PORT:") && strings.HasSuffix(val, "}") {
-			name := val[7 : len(val)-1]
-			if _, ok := env.Ports[name]; !ok {
-				port, _ := allocator.Allocate()
-				env.Ports[name] = port
+	for _, value := range svcCfg.Environment {
+		for _, match := range portPlaceholderPattern.FindAllStringSubmatch(value, -1) {
+			name := match[1]
+			if _, ok := env.Ports[name]; ok {
+				continue
 			}
-		}
-	}
-
-	if portVar, ok := svcCfg.Environment["PORT"]; ok {
-		if strings.HasPrefix(portVar, "${PORT:") && strings.HasSuffix(portVar, "}") {
-			name := portVar[7 : len(portVar)-1]
-			port, _ := allocator.Allocate()
+			port, err := allocator.Allocate()
+			if err != nil {
+				return nil, err
+			}
 			env.Ports[name] = port
 		}
 	}
 
-	return env
+	return env, nil
 }
 
 func strPtr(s string) *string {
 	return &s
 }
 
-func setErrorState(state *capsule.State, err error, cs *state.Store, repoID, name string) {
+func setErrorState(state *capsule.State, err error, cs *state.Store, repoID, name string) error {
 	state.Status = "error"
 	state.LastError = strPtr(err.Error())
 	state.UpdatedAt = time.Now().UTC()
-	cs.Save(repoID, name, state)
+	return cs.Save(repoID, name, state)
 }
 
-func setupEnv(cmd *exec.Cmd, svcEnv *serviceEnv) {
-	cmd.Env = os.Environ()
-
-	if svcEnv == nil {
-		return
+func setupEnv(cmd *exec.Cmd, svcCfg config.ServiceConfig, svcEnv *serviceEnv) {
+	env := make(map[string]string)
+	for _, name := range []string{"PATH", "HOME", "USER", "LOGNAME", "TMPDIR", "TEMP", "TMP", "SystemRoot", "COMSPEC", "PATHEXT"} {
+		if value, ok := os.LookupEnv(name); ok {
+			env[name] = value
+		}
 	}
-
+	for _, name := range svcCfg.InheritEnvironment {
+		if value, ok := os.LookupEnv(name); ok {
+			env[name] = value
+		}
+	}
+	for name, value := range svcCfg.Environment {
+		env[name] = resolvePortVar(value, svcEnv.Ports)
+	}
 	for svcName, port := range svcEnv.Ports {
 		key := fmt.Sprintf("PORT_%s", strings.ToUpper(svcName))
-		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%d", key, port))
+		env[key] = fmt.Sprintf("%d", port)
+	}
+
+	keys := make([]string, 0, len(env))
+	for key := range env {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	cmd.Env = make([]string, 0, len(keys))
+	for _, key := range keys {
+		cmd.Env = append(cmd.Env, key+"="+env[key])
 	}
 }
 

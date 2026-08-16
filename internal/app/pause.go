@@ -10,6 +10,10 @@ import (
 )
 
 func Pause(name string) (*PauseResult, error) {
+	if err := validateCapsuleName(name); err != nil {
+		return nil, err
+	}
+
 	root, err := findGitRoot()
 	if err != nil {
 		return nil, err
@@ -26,10 +30,13 @@ func Pause(name string) (*PauseResult, error) {
 	}
 	defer cl.Release()
 
-	stateBase, _ := getStateDir()
+	stateBase, err := getStateDir()
+	if err != nil {
+		return nil, err
+	}
 	cs := state.NewStore(stateBase)
 
-	s, err := cs.Load(repoID, name)
+	s, err := loadValidatedCapsule(cs, stateBase, repoID, name)
 	if err != nil {
 		return nil, fmt.Errorf("capsule not found: %s", name)
 	}
@@ -44,7 +51,9 @@ func Pause(name string) (*PauseResult, error) {
 
 	s.Status = "pausing"
 	s.UpdatedAt = time.Now().UTC()
-	cs.Save(repoID, name, s)
+	if err := cs.Save(repoID, name, s); err != nil {
+		return nil, fmt.Errorf("failed to persist pausing state: %v", err)
+	}
 
 	var svcInfos []ServiceInfo
 
@@ -72,7 +81,9 @@ func Pause(name string) (*PauseResult, error) {
 	s.Status = "paused"
 	s.UpdatedAt = now
 	s.LastPausedAt = &now
-	cs.Save(repoID, name, s)
+	if err := cs.Save(repoID, name, s); err != nil {
+		return nil, fmt.Errorf("services stopped but paused state could not be persisted: %v", err)
+	}
 
 	return &PauseResult{Services: svcInfos}, nil
 }

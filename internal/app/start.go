@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -91,6 +92,9 @@ func Start(name string, opts StartOptions) (*StartResult, error) {
 	}
 
 	worktreesDir := filepath.Join(stateBase, "worktrees")
+	if err := state.EnsureDir(filepath.Join(worktreesDir, repoName), 0700); err != nil {
+		return nil, fmt.Errorf("cannot create managed worktree directory: %v", err)
+	}
 	worktreePath := filepath.Join(worktreesDir, repoName, slug)
 
 	inUse, _ := git.BranchInUse(capsuleBranch, root)
@@ -121,8 +125,8 @@ func Start(name string, opts StartOptions) (*StartResult, error) {
 		newState.Status = "error"
 		newState.LastError = strPtr(fmt.Sprintf("failed to create worktree: %v", err))
 		newState.UpdatedAt = time.Now().UTC()
-		cs.Save(repoID, slug, newState)
-		return nil, fmt.Errorf("failed to create worktree: %v\nPath: %s", err, worktreePath)
+		persistErr := cs.Save(repoID, slug, newState)
+		return nil, errors.Join(fmt.Errorf("failed to create worktree: %v\nPath: %s", err, worktreePath), persistErr)
 	}
 
 	// Run setup commands
@@ -132,15 +136,18 @@ func Start(name string, opts StartOptions) (*StartResult, error) {
 			newState.Status = "error"
 			newState.LastError = strPtr(fmt.Sprintf("setup failed: %v", err))
 			newState.UpdatedAt = time.Now().UTC()
-			cs.Save(repoID, slug, newState)
-			return nil, fmt.Errorf("setup command failed: %s\n%s", strings.Join(setup.Command, " "), string(output))
+			setupErr := fmt.Errorf("setup command failed: %s\n%s", strings.Join(setup.Command, " "), string(output))
+			persistErr := cs.Save(repoID, slug, newState)
+			return nil, errors.Join(setupErr, persistErr)
 		}
 	}
 
 	if opts.NoServices {
 		newState.Status = "running"
 		newState.UpdatedAt = time.Now().UTC()
-		cs.Save(repoID, slug, newState)
+		if err := cs.Save(repoID, slug, newState); err != nil {
+			return nil, fmt.Errorf("worktree created but running state could not be persisted: %v", err)
+		}
 		return &StartResult{
 			Name:         slug,
 			Branch:       capsuleBranch,
@@ -152,14 +159,18 @@ func Start(name string, opts StartOptions) (*StartResult, error) {
 	// Sequential service startup with health checks and rollback
 	started, serviceInfos, startErr := startServices(cfg, stateBase, repoID, slug, worktreePath, newState, cs)
 	if startErr != nil {
-		rollbackServices(started, newState, cs)
-		setErrorState(newState, startErr, cs, repoID, slug)
-		return nil, startErr
+		rollbackServices(started, newState)
+		persistErr := setErrorState(newState, startErr, cs, repoID, slug)
+		return nil, errors.Join(startErr, persistErr)
 	}
 
 	newState.Status = "running"
 	newState.UpdatedAt = time.Now().UTC()
-	cs.Save(repoID, slug, newState)
+	if err := cs.Save(repoID, slug, newState); err != nil {
+		rollbackServices(started, newState)
+		persistErr := setErrorState(newState, err, cs, repoID, slug)
+		return nil, errors.Join(fmt.Errorf("services started but running state could not be persisted: %w", err), persistErr)
+	}
 
 	return &StartResult{
 		Name:         slug,
@@ -175,18 +186,33 @@ func startServices(cfg *config.Config, stateBase, repoID, slug, worktreePath str
 	var started []startedService
 
 	for svcName, svcCfg := range cfg.Services {
-		env := buildServiceEnv(svcCfg, allocator)
+		env, err := buildServiceEnv(svcCfg, allocator)
+		if err != nil {
+			return started, nil, fmt.Errorf("cannot allocate ports for service %s: %v", svcName, err)
+		}
 
 		logDir := filepath.Join(stateBase, "capsules", repoID, slug, "logs")
-		os.MkdirAll(logDir, 0755)
+		if err := state.EnsureDir(logDir, 0700); err != nil {
+			return started, nil, fmt.Errorf("cannot create service log directory: %v", err)
+		}
 		logFile := filepath.Join(logDir, svcName+".log")
 
-		f, err := os.Create(logFile)
+		f, err := os.OpenFile(logFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 		if err != nil {
 			return started, nil, fmt.Errorf("cannot create log file for %s: %v", svcName, err)
 		}
 
-		cmd := execInDir(svcCfg.Command, worktreePath)
+		serviceDir := worktreePath
+		if svcCfg.WorkingDirectory != "" {
+			serviceDir = filepath.Join(worktreePath, svcCfg.WorkingDirectory)
+		}
+		if err := config.ValidateWorkDir(serviceDir, worktreePath); err != nil {
+			_ = f.Close()
+			return started, nil, fmt.Errorf("invalid working directory for service %s: %v", svcName, err)
+		}
+
+		cmd := execInDir(svcCfg.Command, serviceDir)
+		setupEnv(cmd, svcCfg, env)
 		cmd.Stdout = f
 		cmd.Stderr = f
 		process.SetProcessGroup(cmd)
@@ -198,6 +224,14 @@ func startServices(cfg *config.Config, stateBase, repoID, slug, worktreePath str
 
 		pgid := process.GetProcessGroup(cmd)
 		pid := cmd.Process.Pid
+		if err := f.Close(); err != nil {
+			if pgid > 0 {
+				process.StopProcessGroup(pgid, 5)
+			} else {
+				process.StopProcess(pid, 5)
+			}
+			return started, nil, fmt.Errorf("cannot close parent log handle for service %s: %v", svcName, err)
+		}
 		port := env.Ports[svcName]
 
 		svc := startedService{
@@ -222,7 +256,9 @@ func startServices(cfg *config.Config, stateBase, repoID, slug, worktreePath str
 		}
 		newState.Services[svcName] = svcState
 		newState.UpdatedAt = time.Now().UTC()
-		cs.Save(repoID, slug, newState)
+		if err := cs.Save(repoID, slug, newState); err != nil {
+			return started, nil, fmt.Errorf("cannot persist starting service %s: %v", svcName, err)
+		}
 
 		// Health check
 		if svcCfg.Health != nil {
@@ -275,7 +311,9 @@ func startServices(cfg *config.Config, stateBase, repoID, slug, worktreePath str
 		svcState.Status = "running"
 		newState.Services[svcName] = svcState
 		newState.UpdatedAt = time.Now().UTC()
-		cs.Save(repoID, slug, newState)
+		if err := cs.Save(repoID, slug, newState); err != nil {
+			return started, nil, fmt.Errorf("cannot persist running service %s: %v", svcName, err)
+		}
 	}
 
 	serviceInfos := make([]ServiceInfo, 0, len(started))
@@ -291,9 +329,7 @@ func startServices(cfg *config.Config, stateBase, repoID, slug, worktreePath str
 	return started, serviceInfos, nil
 }
 
-func rollbackServices(started []startedService, state *capsule.State, cs *state.Store) {
-	repoID := state.RepositoryID
-
+func rollbackServices(started []startedService, state *capsule.State) {
 	for i := len(started) - 1; i >= 0; i-- {
 		s := started[i]
 		if s.PGID > 0 {
@@ -312,7 +348,6 @@ func rollbackServices(started []startedService, state *capsule.State, cs *state.
 
 	state.Status = "error"
 	state.UpdatedAt = time.Now().UTC()
-	cs.Save(repoID, state.Name, state)
 }
 
 func resolvePortVar(s string, ports map[string]int) string {

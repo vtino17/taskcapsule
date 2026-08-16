@@ -93,3 +93,13 @@ func TestReleaseNilLock(t *testing.T) {
 		t.Fatalf("release nil lock should not error: %v", err)
 	}
 }
+
+func TestManagerRejectsUnsafeKeys(t *testing.T) {
+	manager := NewManager(t.TempDir())
+	if _, err := manager.Acquire("../outside", "safe", "test"); err == nil {
+		t.Fatal("unsafe repository ID was accepted")
+	}
+	if _, err := manager.Acquire("0123456789abcdef", "../../outside", "test"); err == nil {
+		t.Fatal("unsafe capsule name was accepted")
+	}
+}

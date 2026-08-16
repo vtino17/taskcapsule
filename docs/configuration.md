@@ -21,8 +21,8 @@ File: `.taskcapsule.json`
 |-------|------|-------------|
 | `command` | array | Command to run (required) |
 | `workingDirectory` | string | Working directory relative to worktree |
-| `environment` | object | Environment variables with `${PORT:name}` support |
-| `inheritEnvironment` | array | Environment variable names to inherit |
+| `environment` | object | Static, non-secret environment values with `${PORT:name}` support |
+| `inheritEnvironment` | array | Parent environment variable names to copy without persisting their values |
 | `health` | object | Health check configuration |
 
 ## Health check types
@@ -34,4 +34,8 @@ File: `.taskcapsule.json`
 
 ## Command security
 
-Commands must be arrays, not shell strings. This prevents injection.
+Commands must be non-empty arrays and are passed directly to the operating system without shell-string interpolation. They still execute with the current user's permissions, so repository configuration must be trusted.
+
+Service and check names are bounded identifiers containing letters, digits, `_`, or `-`. Environment variable names use the portable `[A-Za-z_][A-Za-z0-9_]*` form. Working directories must be relative and remain inside the capsule worktree after symlink resolution.
+
+Do not store secrets in `environment`. List their variable names in `inheritEnvironment`; TaskCapsule reads those values at service start and does not write them to capsule state.

@@ -125,11 +125,18 @@ func findGitRoot() (string, error) {
 
 func getStateDir() (string, error) {
 	if dir := os.Getenv("TASKCAPSULE_HOME"); dir != "" {
-		return dir, nil
+		abs, err := filepath.Abs(dir)
+		if err != nil {
+			return "", fmt.Errorf("resolve TASKCAPSULE_HOME: %v", err)
+		}
+		if filepath.Dir(abs) == abs {
+			return "", fmt.Errorf("TASKCAPSULE_HOME must not be a filesystem root")
+		}
+		return abs, nil
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("cannot find home directory: %v", err)
 	}
-	return filepath.Join(home, ".taskcapsule"), nil
+	return filepath.Abs(filepath.Join(home, ".taskcapsule"))
 }

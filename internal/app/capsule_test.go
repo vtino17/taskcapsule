@@ -3,6 +3,7 @@ package app
 import (
 	"errors"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -69,15 +70,22 @@ func TestGetStateDirDefault(t *testing.T) {
 }
 
 func TestGetStateDirEnv(t *testing.T) {
-	os.Setenv("TASKCAPSULE_HOME", "/tmp/test-tc-home")
-	defer os.Unsetenv("TASKCAPSULE_HOME")
+	want := filepath.Join(t.TempDir(), "test-tc-home")
+	t.Setenv("TASKCAPSULE_HOME", want)
 
 	dir, err := getStateDir()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if dir != "/tmp/test-tc-home" {
-		t.Errorf("expected /tmp/test-tc-home, got %s", dir)
+	if dir != want {
+		t.Errorf("expected %s, got %s", want, dir)
+	}
+}
+
+func TestGetStateDirRejectsFilesystemRoot(t *testing.T) {
+	t.Setenv("TASKCAPSULE_HOME", string(os.PathSeparator))
+	if _, err := getStateDir(); err == nil {
+		t.Fatal("filesystem root was accepted as TASKCAPSULE_HOME")
 	}
 }
 

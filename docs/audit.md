@@ -1,92 +1,53 @@
-# TaskCapsule Audit
+# Assurance record
 
-## Declared Go Version
+This document describes reproducible evidence for TaskCapsule. It is not an external certification and does not guarantee defect-free operation.
 
-`go.mod`: `go 1.24`
+## Required pull-request gates
 
-## Go Version in CI
+| Control | Evidence |
+| --- | --- |
+| Formatting and static analysis | `gofmt`, `go vet` |
+| Unit behavior | `go test ./...` plus coverage artifact |
+| Data-race detection | `go test -race ./...` on a supported GitHub Linux runner |
+| Lifecycle behavior | tagged integration suite, with a separate race run |
+| Platform compatibility | macOS and Windows smoke jobs plus release cross-builds |
+| Known Go vulnerabilities | pinned `govulncheck` module invocation |
+| Static security analysis | CodeQL for Go |
+| Workflow and repository posture | OpenSSF Scorecard SARIF |
+| Release integrity | two-build reproducibility comparison and SHA-256 checksums |
+| Release inventory | CycloneDX SBOM |
+| Provenance | GitHub artifact attestation using OIDC |
 
-Every workflow job uses `go-version-file: go.mod` (resolves to `go 1.24`).
+## Local candidate validation
 
-## CI Validation
+The hardening candidate is evaluated with the checksum-verified official Go 1.25.12 Linux arm64 toolchain. Go 1.24 was rejected after `govulncheck` identified reachable standard-library vulnerabilities fixed in supported Go 1.25 patches.
 
-Final PR commit: `f3b0f7d89edc6604c0ba8a77902b9cfde191c807`
-Workflow run: [30006669553](https://github.com/vtino17/taskcapsule/actions/runs/30006669553)
+| Command | Result |
+| --- | --- |
+| `go test ./... -count=1 -timeout 15m` | Passed |
+| `go test -tags=integration ./test/integration/... -timeout 20m` | Passed |
+| `go vet ./...` | Passed |
+| `go run golang.org/x/vuln/cmd/govulncheck@v1.6.0 ./...` | Passed: no vulnerabilities found |
+| `bash scripts/verify-reproducible-release.sh <output>` | Passed: five target archives matched byte-for-byte and all checksums verified |
+| `go test -race ./...` | Environment blocked: local kernel exposes an unsupported ThreadSanitizer VMA range |
 
-| Job | Conclusion |
-|-----|-----------|
-| lint | CI VERIFIED / SUCCESS |
-| test | CI VERIFIED / SUCCESS |
-| race | CI VERIFIED / SUCCESS |
-| build | CI VERIFIED / SUCCESS |
-| integration | CI VERIFIED / SUCCESS |
-| integration-race | CI VERIFIED / SUCCESS |
-| release-dry-run | CI VERIFIED / SUCCESS |
+The authoritative race result is therefore the protected GitHub CI job, which runs on a supported hosted runner.
 
-## Local Validation
+## Security controls under test
 
-| Command | Status |
-|---------|--------|
-| `go build ./...` | VERIFIED |
-| `go test ./...` | VERIFIED |
-| `go vet ./...` | VERIFIED |
-| `gofmt -l .` | VERIFIED |
-| `go mod verify` | VERIFIED |
-| Race tests (local) | BLOCKED (CGO unavailable) |
+- unsafe capsule, service, check, repository, and state path inputs fail closed;
+- loaded state cannot redirect worktree cleanup outside the managed root;
+- service working-directory symlinks cannot escape a worktree;
+- unlisted parent environment values are not passed to child services;
+- state replacement uses a unique same-directory temporary file, synchronization, and rename;
+- on Unix, state directories are mode `0700` and state, service logs, check logs, and handoff files are mode `0600`; Windows storage inherits the current account's ACLs;
+- action dependencies are pinned to immutable commits;
+- published archives are compared byte-for-byte across two builds before release.
 
-## Package Test Coverage
+## Known limitations
 
-All 13 packages have tests:
-
-| Package | Tests | Status |
-|---------|-------|--------|
-| `app` | Yes (exit codes, state dir, log reader) | VERIFIED |
-| `capsule` | Yes (model, validation, state machine) | VERIFIED |
-| `checks` | Yes (success, failure, missing exec) | VERIFIED |
-| `cli` | Yes (completion, command dispatch) | VERIFIED |
-| `config` | Yes (load, template, validate) | VERIFIED |
-| `git` | Yes (branch, repo ID, worktree) | LOCALLY VERIFIED |
-| `health` | Yes (HTTP, TCP, timeout, StatusError) | VERIFIED |
-| `lock` | Yes (file lock, isAlive) | VERIFIED |
-| `ports` | Yes (allocator) | VERIFIED |
-| `process` | Yes (start, stop, group, helper pattern) | VERIFIED |
-| `report` | Yes (handoff, redact) | VERIFIED |
-| `state` | Yes (store, atomic writes) | VERIFIED |
-| `version` | Yes (build info) | VERIFIED |
-
-Note: The duplicate `internal/doctor` package was removed. It was dead code (no references to it existed anywhere in the codebase). All doctor functionality is provided by `internal/app.Doctor()`.
-
-## Shell Completion
-
-| Shell | Generation | Syntax Check | Status |
-|-------|-----------|-------------|--------|
-| bash | VERIFIED | NOT VERIFIED (bash -n unavailable) | LOCALLY VERIFIED |
-| zsh | VERIFIED | NOT VERIFIED | LOCALLY VERIFIED |
-| fish | VERIFIED | NOT VERIFIED | LOCALLY VERIFIED |
-| powershell | VERIFIED | CI VERIFIED | VERIFIED |
-
-## Log Safety
-
-- Default: 200 lines / 256 KiB tail
-- Configurable via `--lines N` flag
-- Large files: tail from byte limit + truncation notice
-
-## Platform Support
-
-| Feature | Linux | macOS | Windows |
-|---------|-------|-------|---------|
-| Git worktree | CI VERIFIED | CI VERIFIED | NOT VERIFIED |
-| Process groups | CI VERIFIED | CI VERIFIED | EXPERIMENTAL |
-| PID management | CI VERIFIED | CI VERIFIED | PARTIAL |
-| Port allocation | CI VERIFIED | CI VERIFIED | CI VERIFIED |
-| Health checks | CI VERIFIED | CI VERIFIED | CI VERIFIED |
-| Secret redaction | CI VERIFIED | CI VERIFIED | CI VERIFIED |
-
-## Tag-Triggered Release Publication
-
-NOT VERIFIED. No release tag has been created.
-
-## Known Limitations
-
-- Windows process management is EXPERIMENTAL
-- Docker Compose integration: NOT IMPLEMENTED
+- Windows process lifecycle management is experimental.
+- Local ephemeral-port allocation has an unavoidable bind gap between reservation and service startup; services must handle a bind failure, and TaskCapsule rolls back partial startup.
+- Commands and health destinations from `.taskcapsule.json` are trusted input and execute with the current user's authority.
+- Redaction is pattern-based defense in depth and requires human inspection before a handoff crosses trust boundaries.
+- A tag-triggered release with the new SBOM and attestation path is not considered verified until its GitHub run succeeds.

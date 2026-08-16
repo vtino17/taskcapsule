@@ -3,6 +3,7 @@ package checks
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -46,8 +47,26 @@ func TestSaveLog(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(path); os.IsNotExist(err) {
+	info, err := os.Stat(path)
+	if os.IsNotExist(err) {
 		t.Errorf("log file not created: %s", path)
+	} else if err != nil {
+		t.Fatal(err)
+	} else if runtime.GOOS != "windows" && info.Mode().Perm() != 0600 {
+		t.Errorf("expected log mode 0600, got %o", info.Mode().Perm())
+	}
+	dirInfo, err := os.Stat(logDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if runtime.GOOS != "windows" && dirInfo.Mode().Perm() != 0700 {
+		t.Errorf("expected log directory mode 0700, got %o", dirInfo.Mode().Perm())
+	}
+}
+
+func TestSaveLogRejectsNilResult(t *testing.T) {
+	if _, err := SaveLog(t.TempDir(), nil); err == nil {
+		t.Fatal("expected nil result to be rejected")
 	}
 }
 

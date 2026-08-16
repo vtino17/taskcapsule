@@ -53,7 +53,13 @@ func Run(worktreePath string, command []string) (*Result, error) {
 }
 
 func SaveLog(logDir string, result *Result) (string, error) {
-	if err := os.MkdirAll(logDir, 0755); err != nil {
+	if result == nil {
+		return "", fmt.Errorf("result must not be nil")
+	}
+	if err := os.MkdirAll(logDir, 0700); err != nil {
+		return "", err
+	}
+	if err := os.Chmod(logDir, 0700); err != nil {
 		return "", err
 	}
 
@@ -63,7 +69,7 @@ func SaveLog(logDir string, result *Result) (string, error) {
 	content := fmt.Sprintf("Command: %s\nDuration: %.1fs\nExit code: %d\n\n%s",
 		result.Command, result.Duration.Seconds(), result.ExitCode, result.Output)
 
-	if err := os.WriteFile(logFile, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(logFile, []byte(content), 0600); err != nil {
 		return "", err
 	}
 
